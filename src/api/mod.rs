@@ -88,11 +88,14 @@ impl Resolver {
         query: &str,
         translation: &str,
     ) -> Result<Vec<SearchResult>, String> {
-        // Search always uses online API (bundled search would be slow)
-        // But for KJV we can do a simple text scan as fallback
+        // For KJV, use bundled data (instant, clean text, no Strong's numbers)
+        if translation.eq_ignore_ascii_case("KJV") {
+            return Ok(kjv::search(query));
+        }
+
+        // For other translations, use Bolls API
         match self.bolls.search(query, translation).await {
             Ok(results) => Ok(results),
-            Err(_) if translation.eq_ignore_ascii_case("KJV") => Ok(kjv::search(query)),
             Err(e) => Err(format!("Search failed: {}", e)),
         }
     }

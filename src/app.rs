@@ -159,6 +159,7 @@ impl App {
                         self.handle_search_results(key).await;
                         return;
                     }
+                    SearchMode::Loading(_) => return, // Wait for search to complete
                     SearchMode::Off => {}
                 }
 
@@ -208,57 +209,45 @@ impl App {
     }
 
     async fn handle_search_input(&mut self, key: KeyCode) {
-        let state = match &mut self.mode {
-            AppMode::Browser(s) => s,
-            _ => return,
-        };
+        // Extract the query if Enter is pressed, handle other keys inline
+        let mut should_search: Option<String> = None;
 
-        match key {
-            KeyCode::Esc => {
-                state.search = SearchMode::Off;
-            }
-            KeyCode::Enter => {
-                let query = match &state.search {
-                    SearchMode::Input(q) => q.clone(),
-                    _ => return,
-                };
-                if query.trim().is_empty() {
+        if let AppMode::Browser(state) = &mut self.mode {
+            match key {
+                KeyCode::Esc => {
                     state.search = SearchMode::Off;
                     return;
                 }
-                // Perform search
-                match self.resolver.search(&query, "KJV").await {
-                    Ok(results) => {
-                        let mut list_state = ListState::default();
-                        if !results.is_empty() {
-                            list_state.select(Some(0));
-                        }
-                        state.search = SearchMode::Results {
-                            query,
-                            results,
-                            list_state,
-                        };
+                KeyCode::Enter => {
+                    let query = match &state.search {
+                        SearchMode::Input(q) => q.clone(),
+                        _ => return,
+                    };
+                    if query.trim().is_empty() {
+                        state.search = SearchMode::Off;
+                        return;
                     }
-                    Err(_) => {
-                        state.search = SearchMode::Results {
-                            query,
-                            results: vec![],
-                            list_state: ListState::default(),
-                        };
+                    state.search = SearchMode::Loading(query.clone());
+                    should_search = Some(query);
+                }
+                KeyCode::Backspace => {
+                    if let SearchMode::Input(ref mut text) = state.search {
+                        text.pop();
                     }
+                    return;
                 }
-            }
-            KeyCode::Backspace => {
-                if let SearchMode::Input(ref mut text) = state.search {
-                    text.pop();
+                KeyCode::Char(c) => {
+                    if let SearchMode::Input(ref mut text) = state.search {
+                        text.push(c);
+                    }
+                    return;
                 }
+                _ => return,
             }
-            KeyCode::Char(c) => {
-                if let SearchMode::Input(ref mut text) = state.search {
-                    text.push(c);
-                }
-            }
-            _ => {}
+        }
+
+        if let Some(query) = should_search {
+            self.perform_search(query).await;
         }
     }
 
@@ -303,6 +292,31 @@ impl App {
                 state.search = SearchMode::Input(String::new());
             }
             _ => {}
+        }
+    }
+
+    async fn perform_search(&mut self, query: String) {
+        if let AppMode::Browser(ref mut state) = self.mode {
+            match self.resolver.search(&query, "KJV").await {
+                Ok(results) => {
+                    let mut list_state = ListState::default();
+                    if !results.is_empty() {
+                        list_state.select(Some(0));
+                    }
+                    state.search = SearchMode::Results {
+                        query,
+                        results,
+                        list_state,
+                    };
+                }
+                Err(_) => {
+                    state.search = SearchMode::Results {
+                        query,
+                        results: vec![],
+                        list_state: ListState::default(),
+                    };
+                }
+            }
         }
     }
 

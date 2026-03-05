@@ -25,6 +25,8 @@ pub enum SearchMode {
     Off,
     /// Typing in the search input
     Input(String),
+    /// Search in progress
+    Loading(String),
     /// Viewing search results
     Results {
         query: String,
@@ -244,7 +246,7 @@ pub fn render_browser(
     frame.render_widget(outer_block, area);
 
     // Layout: main content + optional search bar + status bar
-    let has_search_input = matches!(state.search, SearchMode::Input(_));
+    let has_search_input = matches!(state.search, SearchMode::Input(_) | SearchMode::Loading(_));
     let main_and_status = if has_search_input {
         Layout::vertical([
             Constraint::Min(1),    // Main content
@@ -271,10 +273,13 @@ pub fn render_browser(
     render_books_panel(frame, panels[0], state, theme);
     render_chapters_panel(frame, panels[1], state, theme);
 
-    // Scripture panel shows search results when in results mode
-    match &mut state.search {
+    // Scripture panel shows search results or loading when searching
+    match &state.search {
         SearchMode::Results { .. } => {
             render_search_results_panel(frame, panels[2], state, theme);
+        }
+        SearchMode::Loading(query) => {
+            render_search_loading(frame, panels[2], query, theme);
         }
         _ => {
             render_scripture_panel(frame, panels[2], state, theme);
@@ -303,7 +308,7 @@ fn panel_border_style(active: bool, theme: &Theme) -> Style {
 }
 
 fn render_books_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
-    let is_active = state.active_panel == Panel::Books && matches!(state.search, SearchMode::Off);
+    let is_active = state.active_panel == Panel::Books && matches!(state.search, SearchMode::Off | SearchMode::Loading(_));
     let block = Block::default()
         .title(Span::styled(
             " Books ",
@@ -339,7 +344,7 @@ fn render_books_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, t
 }
 
 fn render_chapters_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
-    let is_active = state.active_panel == Panel::Chapters && matches!(state.search, SearchMode::Off);
+    let is_active = state.active_panel == Panel::Chapters && matches!(state.search, SearchMode::Off | SearchMode::Loading(_));
     let block = Block::default()
         .title(Span::styled(
             " Ch ",
@@ -375,7 +380,7 @@ fn render_chapters_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState
 }
 
 fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
-    let is_active = state.active_panel == Panel::Scripture && matches!(state.search, SearchMode::Off);
+    let is_active = state.active_panel == Panel::Scripture && matches!(state.search, SearchMode::Off | SearchMode::Loading(_));
 
     let title = if let Some(ref ch) = state.current_chapter {
         format!(" {} {} ", ch.book, ch.chapter)
@@ -489,6 +494,30 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
     }
 }
 
+fn render_search_loading(frame: &mut Frame, area: Rect, query: &str, theme: &Theme) {
+    let block = Block::default()
+        .title(Span::styled(
+            format!(" Searching... "),
+            Style::default().fg(theme.accent).bold(),
+        ))
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme.border_active))
+        .style(Style::default().bg(theme.surface));
+
+    let loading = Paragraph::new(vec![
+        Line::default(),
+        Line::default(),
+        Line::from(Span::styled(
+            format!("Searching for \"{}\"...", query),
+            Style::default().fg(theme.text_dim),
+        )),
+    ])
+    .block(block)
+    .alignment(Alignment::Center);
+    frame.render_widget(loading, area);
+}
+
 fn render_search_results_panel(
     frame: &mut Frame,
     area: Rect,
@@ -587,27 +616,43 @@ fn render_search_results_panel(
 }
 
 fn render_search_input(frame: &mut Frame, area: Rect, state: &BrowserState, theme: &Theme) {
-    let input_text = match &state.search {
-        SearchMode::Input(text) => text.as_str(),
-        _ => "",
-    };
+    match &state.search {
+        SearchMode::Input(text) => {
+            let block = Block::default()
+                .title(Span::styled(" Search ", Style::default().fg(theme.accent).bold()))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.border_active))
+                .padding(Padding::horizontal(1))
+                .style(Style::default().bg(theme.surface));
 
-    let block = Block::default()
-        .title(Span::styled(" Search ", Style::default().fg(theme.accent).bold()))
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme.border_active))
-        .padding(Padding::horizontal(1))
-        .style(Style::default().bg(theme.surface));
+            let cursor = "\u{2588}"; // block cursor
+            let input = Paragraph::new(Line::from(vec![
+                Span::styled(text.as_str(), Style::default().fg(theme.text)),
+                Span::styled(cursor, Style::default().fg(theme.accent_soft)),
+            ]))
+            .block(block);
 
-    let cursor = "\u{2588}"; // block cursor
-    let input = Paragraph::new(Line::from(vec![
-        Span::styled(input_text, Style::default().fg(theme.text)),
-        Span::styled(cursor, Style::default().fg(theme.accent_soft)),
-    ]))
-    .block(block);
+            frame.render_widget(input, area);
+        }
+        SearchMode::Loading(query) => {
+            let block = Block::default()
+                .title(Span::styled(" Search ", Style::default().fg(theme.accent).bold()))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.border_active))
+                .padding(Padding::horizontal(1))
+                .style(Style::default().bg(theme.surface));
 
-    frame.render_widget(input, area);
+            let input = Paragraph::new(Line::from(vec![
+                Span::styled(format!("Searching \"{}\"...", query), Style::default().fg(theme.text_dim)),
+            ]))
+            .block(block);
+
+            frame.render_widget(input, area);
+        }
+        _ => {}
+    }
 }
 
 fn render_status_bar(frame: &mut Frame, area: Rect, theme: &Theme, theme_name: ThemeName) {
