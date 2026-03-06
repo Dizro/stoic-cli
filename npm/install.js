@@ -66,8 +66,7 @@ function download(url, dest) {
         });
 
         res.pipe(file);
-        file.on("finish", () => {
-          file.close();
+        file.on("close", () => {
           if (total > 0) process.stderr.write("\n");
           resolve();
         });
