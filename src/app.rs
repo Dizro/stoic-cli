@@ -219,9 +219,9 @@ impl App {
                         }
                         KeyCode::Enter => {
                             let target =
-                                state.selected_search_result().map(|r| (r.book.clone(), r.chapter));
-                            if let Some((book, chapter)) = target {
-                                state.jump_to_result(&book, chapter);
+                                state.selected_search_result().map(|r| (r.book.clone(), r.chapter, r.verse));
+                            if let Some((book, chapter, verse)) = target {
+                                state.jump_to_result(&book, chapter, verse);
                                 self.load_chapter().await;
                             } else {
                                 // No result selected — trigger search (for online translations)

@@ -100,6 +100,8 @@ pub struct BrowserState {
     pub localized_books: Vec<String>,
     /// Background download handle for caching a translation.
     pub download: Option<cache::DownloadHandle>,
+    /// Verse to highlight after jumping from search results.
+    pub highlight_verse: Option<u32>,
 }
 
 impl BrowserState {
@@ -124,6 +126,7 @@ impl BrowserState {
             translation_list: ListState::default(),
             localized_books: Vec::new(),
             download: None,
+            highlight_verse: None,
         }
     }
 
@@ -266,6 +269,7 @@ impl BrowserState {
                 }
             }
             Panel::Scripture => {
+                self.highlight_verse = None;
                 if self.scripture_scroll > 0 {
                     self.scripture_scroll -= 1;
                 }
@@ -290,6 +294,7 @@ impl BrowserState {
                 }
             }
             Panel::Scripture => {
+                self.highlight_verse = None;
                 self.scripture_scroll += 1;
             }
         }
@@ -324,7 +329,7 @@ impl BrowserState {
     }
 
     /// Navigate to a book and chapter from a search result.
-    pub fn jump_to_result(&mut self, book: &str, chapter: u32) {
+    pub fn jump_to_result(&mut self, book: &str, chapter: u32, verse: u32) {
         // Find the book index
         if let Some(idx) = BOOKS.iter().position(|b| b.name.eq_ignore_ascii_case(book)) {
             self.selected_book_idx = idx;
@@ -334,6 +339,7 @@ impl BrowserState {
             self.scripture_scroll = 0;
             self.active_panel = Panel::Scripture;
             self.search = SearchMode::Off;
+            self.highlight_verse = Some(verse);
         }
     }
 }
@@ -526,16 +532,29 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
     }
 
     if let Some(ref chapter) = state.current_chapter {
+        let highlight = state.highlight_verse;
         let lines: Vec<Line> = chapter
             .verses
             .iter()
             .flat_map(|v| {
+                let is_highlighted = highlight == Some(v.verse);
                 let verse_line = Line::from(vec![
                     Span::styled(
                         format!(" {} ", v.verse),
-                        Style::default().fg(theme.text_muted),
+                        if is_highlighted {
+                            Style::default().fg(theme.accent).bold()
+                        } else {
+                            Style::default().fg(theme.text_muted)
+                        },
                     ),
-                    Span::styled(&v.text, Style::default().fg(theme.text)),
+                    Span::styled(
+                        &v.text,
+                        if is_highlighted {
+                            Style::default().fg(theme.accent_soft).add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default().fg(theme.text)
+                        },
+                    ),
                 ]);
                 vec![verse_line, Line::default()]
             })
@@ -545,12 +564,12 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
         let visible_height = inner.height;
         let wrap_width = inner.width as usize;
 
-        // Calculate actual wrapped content height
-        let content_height: u16 = lines
+        // Calculate wrapped height per line (for scroll targeting)
+        let line_heights: Vec<u16> = lines
             .iter()
             .map(|line| {
                 if line.spans.is_empty() {
-                    return 1; // empty line
+                    return 1;
                 }
                 let line_width: usize = line.spans.iter().map(|s| s.content.len()).sum();
                 if wrap_width == 0 {
@@ -559,7 +578,19 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
                     ((line_width as f64 / wrap_width as f64).ceil() as u16).max(1)
                 }
             })
-            .sum();
+            .collect();
+
+        let content_height: u16 = line_heights.iter().sum();
+
+        // Auto-scroll to highlighted verse
+        if let Some(target_verse) = highlight {
+            // Each verse produces 2 lines (verse + blank), target is at index (verse-1)*2
+            let target_line_idx = (target_verse.saturating_sub(1) as usize) * 2;
+            let scroll_to: u16 = line_heights.iter().take(target_line_idx).sum();
+            // Center the verse on screen
+            let center_offset = visible_height / 3;
+            state.scripture_scroll = scroll_to.saturating_sub(center_offset);
+        }
 
         // Clamp scroll
         if content_height > visible_height {
