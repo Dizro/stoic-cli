@@ -9,14 +9,6 @@ pub struct BollsProvider {
 }
 
 #[derive(Deserialize)]
-struct BollsVerse {
-    #[serde(alias = "pk")]
-    _pk: Option<i64>,
-    verse: u32,
-    text: String,
-}
-
-#[derive(Deserialize)]
 struct BollsBook {
     bookid: u32,
     name: String,
@@ -66,7 +58,7 @@ impl BollsProvider {
             BASE_URL, trans, book.bolls_id, chapter, verse
         );
 
-        let resp: BollsVerse = self
+        let resp: serde_json::Value = self
             .client
             .get(&url)
             .send()
@@ -76,11 +68,13 @@ impl BollsProvider {
             .await
             .map_err(|e| e.to_string())?;
 
+        let text = resp.get("text").and_then(|v| v.as_str()).unwrap_or("");
+
         Ok(Verse {
             book: book.name.to_string(),
             chapter,
             verse,
-            text: clean_html(&resp.text),
+            text: clean_html(text),
             translation: translation.to_uppercase(),
         })
     }
@@ -100,7 +94,7 @@ impl BollsProvider {
             BASE_URL, trans, book.bolls_id, chapter
         );
 
-        let resp: Vec<BollsVerse> = self
+        let resp: Vec<serde_json::Value> = self
             .client
             .get(&url)
             .send()
@@ -111,13 +105,17 @@ impl BollsProvider {
             .map_err(|e| e.to_string())?;
 
         let verses: Vec<Verse> = resp
-            .into_iter()
-            .map(|v| Verse {
-                book: book.name.to_string(),
-                chapter,
-                verse: v.verse,
-                text: clean_html(&v.text),
-                translation: translation.to_uppercase(),
+            .iter()
+            .filter_map(|v| {
+                let verse_num = v.get("verse")?.as_u64()? as u32;
+                let text = v.get("text")?.as_str()?;
+                Some(Verse {
+                    book: book.name.to_string(),
+                    chapter,
+                    verse: verse_num,
+                    text: clean_html(text),
+                    translation: translation.to_uppercase(),
+                })
             })
             .collect();
 
@@ -190,7 +188,7 @@ impl BollsProvider {
         let trans = Self::translation_code(translation);
         let url = format!("{}/get-random-verse/{}/", BASE_URL, trans);
 
-        let resp: BollsVerse = self
+        let resp: serde_json::Value = self
             .client
             .get(&url)
             .send()
@@ -200,11 +198,14 @@ impl BollsProvider {
             .await
             .map_err(|e| e.to_string())?;
 
+        let verse_num = resp.get("verse").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let text = resp.get("text").and_then(|v| v.as_str()).unwrap_or("");
+
         Ok(Verse {
             book: "Unknown".to_string(),
             chapter: 0,
-            verse: resp.verse,
-            text: clean_html(&resp.text),
+            verse: verse_num,
+            text: clean_html(text),
             translation: translation.to_uppercase(),
         })
     }

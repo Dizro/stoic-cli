@@ -300,8 +300,39 @@ async fn download_translation(
         let _ = handle.await;
     }
 
-    // Only mark complete if all chapters were successfully downloaded
-    if !cancel.load(Ordering::Relaxed) && failures.load(Ordering::Relaxed) == 0 {
+    // Mark complete if download succeeded with very few failures
+    if !cancel.load(Ordering::Relaxed) && failures.load(Ordering::Relaxed) < 5 {
+        mark_complete(translation);
+    }
+}
+
+/// Check if a translation is nearly fully cached and retroactively mark it complete.
+/// This fixes translations that were downloaded but never got the `.complete` marker
+/// (e.g. due to a few network failures during the original download).
+pub fn verify_and_mark_complete(translation: &str) {
+    if is_fully_cached(translation) || translation.eq_ignore_ascii_case("KJV") {
+        return;
+    }
+    let Some(dir) = cache_dir() else { return };
+    let trans_dir = dir.join(translation.to_uppercase());
+    if !trans_dir.exists() {
+        return;
+    }
+
+    let mut cached = 0usize;
+    for book in BOOKS {
+        for ch in 1..=book.chapters {
+            if trans_dir
+                .join(format!("{}_{}.json", book.bolls_id, ch))
+                .exists()
+            {
+                cached += 1;
+            }
+        }
+    }
+
+    let total = total_chapters();
+    if cached >= total.saturating_sub(5) {
         mark_complete(translation);
     }
 }

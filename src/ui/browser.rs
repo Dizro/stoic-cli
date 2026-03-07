@@ -922,7 +922,13 @@ fn render_translation_picker(
         };
 
         let prefix = if is_selected { " \u{25b8} " } else { "   " };
-        let suffix = if t.offline { " (offline)" } else { "" };
+        let suffix = if t.offline || cache::is_fully_cached(t.code) {
+            " (offline)"
+        } else if cache::has_cached_data(t.code) {
+            " (cached)"
+        } else {
+            ""
+        };
         let marker = if is_current { " \u{2713}" } else { "" };
         lines.push(Line::from(vec![
             Span::styled(prefix.to_string(), style),

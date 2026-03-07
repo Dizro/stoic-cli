@@ -88,6 +88,11 @@ impl App {
 
         let mut pending_initial = Some((initial_chapter, saved, localized_books));
 
+        // Retroactively mark complete if translation was already cached
+        if let AppMode::Browser(ref state) = self.mode {
+            cache::verify_and_mark_complete(&state.translation);
+        }
+
         // Start background cache download for non-KJV translations
         self.start_cache_download();
 
