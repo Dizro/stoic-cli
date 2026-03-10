@@ -1,15 +1,15 @@
 [package]
-name = "christ-cli"
-version = "0.5.4"
+name = "stoic-cli"
+version = "0.1.0"
 edition = "2021"
-description = "A beautiful Bible TUI for Christian developers"
+description = "A beautiful Stoic philosophy TUI — read Marcus Aurelius, Seneca, and Epictetus in your terminal"
 license = "MIT"
-repository = "https://github.com/whoisyurii/christ-cli"
-homepage = "https://github.com/whoisyurii/christ-cli"
+repository = "https://github.com/whoisyurii/stoic-cli"
+homepage = "https://github.com/whoisyurii/stoic-cli"
 readme = "README.md"
 
 [[bin]]
-name = "christ"
+name = "stoic"
 path = "src/main.rs"
 
 [dependencies]

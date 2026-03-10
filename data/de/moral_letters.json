@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "work": "Briefe an Lucilius",
+    "author": "Seneca",
+    "translator": "",
+    "language": "de",
+    "source": "",
+    "parsed_date": ""
+  },
+  "sections": [
+    {
+      "id": "letters_001",
+      "book": null,
+      "book_title": null,
+      "chapter": null,
+      "chapter_title": null,
+      "letter_number": 1,
+      "letter_title": "ÜBER DIE VERWENDUNG DER ZEIT",
+      "text": "Tu es, mein Lucilius: nimm dich selbst in Besitz...",
+      "word_count": 9,
+      "source_reference": "Brief 1"
+    }
+  ]
+}

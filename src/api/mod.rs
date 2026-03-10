@@ -1,186 +1,115 @@
-pub mod bolls;
 pub mod types;
 
-use crate::data::{books, kjv};
-use crate::store::cache;
+use crate::data::stoics;
 use types::{Chapter, SearchResult, Verse};
 
-pub struct Resolver {
-    bolls: bolls::BollsProvider,
-}
+/// Offline-only resolver for the stoic library.
+/// All data is bundled in the binary — no network requests needed.
+pub struct Resolver;
 
 impl Resolver {
     pub fn new() -> Self {
-        Self {
-            bolls: bolls::BollsProvider::new(),
-        }
+        Self
     }
 
-    pub async fn get_verse(
+    pub fn get_verse(
         &self,
-        book: &str,
-        chapter: u32,
-        verse: u32,
-        translation: &str,
+        work_id: &str,
+        division: u32,
+        section: u32,
     ) -> Result<Verse, String> {
-        // Try bundled KJV first for offline support
-        if translation.eq_ignore_ascii_case("KJV") {
-            if let Some(v) = kjv::get_verse(book, chapter, verse) {
-                return Ok(v);
-            }
-        }
-
-        // Try disk cache
-        if let Some(book_info) = books::normalize_book(book) {
-            if let Some(ch) = cache::load_chapter(translation, book_info.bolls_id, chapter) {
-                if let Some(v) = ch.verses.into_iter().find(|v| v.verse == verse) {
-                    return Ok(v);
-                }
-            }
-        }
-
-        // Cache miss on a "fully cached" translation — cache is incomplete, invalidate
-        if cache::is_fully_cached(translation) {
-            cache::remove_complete_marker(translation);
-        }
-
-        // Try Bolls API
-        match self.bolls.get_verse(book, chapter, verse, translation).await {
-            Ok(v) => Ok(v),
-            Err(e) => Err(format!("Failed to fetch verse: {}", e)),
-        }
+        self.get_verse_lang(work_id, division, section, "en")
     }
 
-    pub async fn get_chapter(
+    pub fn get_verse_lang(
         &self,
-        book: &str,
-        chapter: u32,
-        translation: &str,
+        work_id: &str,
+        division: u32,
+        section: u32,
+        lang: &str,
+    ) -> Result<Verse, String> {
+        stoics::get_verse_lang(work_id, division, section, lang)
+            .ok_or_else(|| format!("Passage not found: {} {}:{}", work_id, division, section))
+    }
+
+    pub fn get_chapter(
+        &self,
+        work_id: &str,
+        division: u32,
     ) -> Result<Chapter, String> {
-        // Try bundled KJV first
-        if translation.eq_ignore_ascii_case("KJV") {
-            if let Some(c) = kjv::get_chapter(book, chapter) {
-                return Ok(c);
-            }
-        }
-
-        // Try disk cache
-        if let Some(book_info) = books::normalize_book(book) {
-            if let Some(c) = cache::load_chapter(translation, book_info.bolls_id, chapter) {
-                return Ok(c);
-            }
-        }
-
-        // Cache miss on a "fully cached" translation — cache is incomplete, invalidate
-        if cache::is_fully_cached(translation) {
-            cache::remove_complete_marker(translation);
-        }
-
-        // Fetch from Bolls API and cache the result
-        match self.bolls.get_chapter(book, chapter, translation).await {
-            Ok(c) => {
-                if let Some(book_info) = books::normalize_book(book) {
-                    cache::save_chapter(translation, book_info.bolls_id, &c);
-                }
-                Ok(c)
-            }
-            Err(e) => Err(format!("Failed to fetch chapter: {}", e)),
-        }
+        stoics::get_chapter(work_id, division)
+            .ok_or_else(|| format!("Section not found: {} {}", work_id, division))
     }
 
-    pub async fn get_verse_range(
+    pub fn get_chapter_lang(
         &self,
-        book: &str,
-        chapter: u32,
-        verse_start: u32,
-        verse_end: u32,
-        translation: &str,
+        work_id: &str,
+        division: u32,
+        lang: &str,
+    ) -> Result<Chapter, String> {
+        stoics::get_chapter_lang(work_id, division, lang)
+            .ok_or_else(|| format!("Section not found: {} {}", work_id, division))
+    }
+
+    pub fn get_verse_range(
+        &self,
+        work_id: &str,
+        division: u32,
+        section_start: u32,
+        section_end: u32,
     ) -> Result<Vec<Verse>, String> {
-        // Try bundled KJV first
-        if translation.eq_ignore_ascii_case("KJV") {
-            let verses = kjv::get_verse_range(book, chapter, verse_start, verse_end);
-            if !verses.is_empty() {
-                return Ok(verses);
-            }
-        }
+        self.get_verse_range_lang(work_id, division, section_start, section_end, "en")
+    }
 
-        // Try disk cache
-        if let Some(book_info) = books::normalize_book(book) {
-            if let Some(ch) = cache::load_chapter(translation, book_info.bolls_id, chapter) {
-                let verses: Vec<Verse> = ch
-                    .verses
-                    .into_iter()
-                    .filter(|v| v.verse >= verse_start && v.verse <= verse_end)
-                    .collect();
-                if !verses.is_empty() {
-                    return Ok(verses);
-                }
-            }
-        }
-
-        // Try Bolls API
-        match self
-            .bolls
-            .get_verse_range(book, chapter, verse_start, verse_end, translation)
-            .await
-        {
-            Ok(v) => Ok(v),
-            Err(e) => Err(format!("Failed to fetch verses: {}", e)),
+    pub fn get_verse_range_lang(
+        &self,
+        work_id: &str,
+        division: u32,
+        section_start: u32,
+        section_end: u32,
+        lang: &str,
+    ) -> Result<Vec<Verse>, String> {
+        let chapter = self.get_chapter_lang(work_id, division, lang)?;
+        let verses: Vec<Verse> = chapter
+            .verses
+            .into_iter()
+            .filter(|v| v.verse >= section_start && v.verse <= section_end)
+            .collect();
+        if verses.is_empty() {
+            Err(format!("No passages found in range {}:{}-{}", work_id, section_start, section_end))
+        } else {
+            Ok(verses)
         }
     }
 
-    pub async fn search(
+    pub fn search(
         &self,
         query: &str,
-        translation: &str,
     ) -> Result<Vec<SearchResult>, String> {
-        // For KJV, use bundled data
-        if translation.eq_ignore_ascii_case("KJV") {
-            return Ok(kjv::search(query));
-        }
-
-        // Always try local cache first — instant for any cached chapters
-        let cached = cache::search(translation, query);
-        if !cached.is_empty() || cache::has_cached_data(translation) {
-            return Ok(cached);
-        }
-
-        // No cached data at all — use Bolls API
-        match self.bolls.search(query, translation).await {
-            Ok(results) => Ok(results),
-            Err(e) => Err(format!("Search failed: {}", e)),
-        }
+        Ok(stoics::search(query))
     }
 
-    pub async fn get_book_names(&self, translation: &str) -> Result<Vec<String>, String> {
-        // Try disk cache first
-        if let Some(names) = cache::load_book_names(translation) {
-            return Ok(names);
-        }
-
-        // Don't hit network if fully cached — fallback to English names
-        if cache::is_fully_cached(translation) {
-            return Ok(Vec::new());
-        }
-
-        // Fetch and cache
-        match self.bolls.get_book_names(translation).await {
-            Ok(names) => {
-                cache::save_book_names(translation, &names);
-                Ok(names)
-            }
-            Err(e) => Err(e),
-        }
+    pub fn search_lang(
+        &self,
+        query: &str,
+        lang: &str,
+    ) -> Result<Vec<SearchResult>, String> {
+        Ok(stoics::search_lang(query, lang))
     }
 
-    pub async fn get_random_verse(&self, translation: &str) -> Result<Verse, String> {
-        if translation.eq_ignore_ascii_case("KJV") {
-            return Ok(kjv::random_verse());
-        }
+    pub fn get_random_verse(&self) -> Verse {
+        stoics::random_verse()
+    }
 
-        match self.bolls.get_random_verse(translation).await {
-            Ok(v) => Ok(v),
-            Err(_) => Ok(kjv::random_verse()),
-        }
+    pub fn get_random_verse_lang(&self, lang: &str) -> Verse {
+        stoics::random_verse_lang(lang)
+    }
+
+    pub fn get_daily_verse(&self) -> Verse {
+        stoics::daily_verse()
+    }
+
+    pub fn get_daily_verse_lang(&self, lang: &str) -> Verse {
+        stoics::daily_verse_lang(lang)
     }
 }

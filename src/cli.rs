@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "christ", about = "A beautiful Bible TUI for Christian developers")]
+#[command(name = "stoic", about = "A beautiful Stoic philosophy TUI — read Aurelius, Seneca & Epictetus in your terminal")]
 #[command(version, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
@@ -14,46 +14,44 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Read a Bible verse, range, or chapter (e.g. "John 3:16", "Genesis 1", "Ps 23:1-6")
+    /// Read a stoic passage (e.g. "meditations 4:3", "seneca 13", "discourses 1:2")
     Read {
-        /// Bible reference (e.g. "John 3:16", "Genesis 1")
+        /// Stoic reference (e.g. "aurelius 4:3", "seneca 13")
         #[arg(required = true, num_args = 1..)]
         reference: Vec<String>,
-
-        /// Bible translation (default: KJV)
-        #[arg(short, long, default_value = "KJV")]
-        translation: String,
+        /// Optional language code (en, ru, fr, de, la, el)
+        #[arg(long, default_value = "en")]
+        lang: String,
     },
 
-    /// Search the Bible for a phrase or keyword
+    /// Search all stoic texts for a phrase or keyword
     Search {
         /// Search query
         #[arg(required = true, num_args = 1..)]
         query: Vec<String>,
-
-        /// Bible translation to search in
-        #[arg(short, long, default_value = "KJV")]
-        translation: String,
+        /// Optional language code (en, ru, fr, de, la, el)
+        #[arg(long, default_value = "en")]
+        lang: String,
     },
 
-    /// Display a random Bible verse
+    /// Display a random stoic passage
     Random {
-        /// Bible translation
-        #[arg(short, long, default_value = "KJV")]
-        translation: String,
+        /// Optional language code (en, ru, fr, de, la, el)
+        #[arg(long, default_value = "en")]
+        lang: String,
     },
 
-    /// Show today's verse of the day
-    Today {
-        /// Bible translation
-        #[arg(short, long, default_value = "KJV")]
-        translation: String,
+    /// Show today's daily stoic passage
+    Daily {
+        /// Optional language code (en, ru, fr, de, la, el)
+        #[arg(long, default_value = "en")]
+        lang: String,
     },
 
     /// Replay the startup animation
     Intro,
 
-    /// Update christ-cli to the latest version
+    /// Update stoic-cli to the latest version
     Update {
         /// Check for updates without installing
         #[arg(long)]

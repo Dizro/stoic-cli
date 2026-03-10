@@ -9,19 +9,13 @@ pub struct SessionState {
     pub book_index: usize,
     pub chapter: u32,
     pub scroll_position: u16,
-    pub active_panel: u8, // 0=Books, 1=Chapters, 2=Scripture
+    pub active_panel: u8, // 0=Works, 1=Sections, 2=Text
     #[serde(default)]
     pub theme: ThemeName,
-    #[serde(default = "default_translation")]
-    pub translation: String,
-}
-
-fn default_translation() -> String {
-    "KJV".to_string()
 }
 
 fn state_path() -> Option<PathBuf> {
-    let dirs = ProjectDirs::from("", "", "christ-cli")?;
+    let dirs = ProjectDirs::from("", "", "stoic-cli")?;
     let data_dir = dirs.data_dir();
     Some(data_dir.join("state.json"))
 }

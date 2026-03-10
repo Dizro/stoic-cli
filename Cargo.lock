@@ -151,24 +151,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "christ-cli"
-version = "0.5.3"
-dependencies = [
- "clap",
- "confy",
- "crossterm",
- "directories 6.0.0",
- "once_cell",
- "ratatui",
- "reqwest",
- "serde",
- "serde_json",
- "tachyonfx",
- "tokio",
- "unicode-width 0.2.0",
-]
-
-[[package]]
 name = "clap"
 version = "4.5.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1363,6 +1345,24 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stoic-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "confy",
+ "crossterm",
+ "directories 6.0.0",
+ "once_cell",
+ "ratatui",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tachyonfx",
+ "tokio",
+ "unicode-width 0.2.0",
+]
 
 [[package]]
 name = "strsim"

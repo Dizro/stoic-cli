@@ -1,80 +1,76 @@
 #!/bin/sh
-# christ-cli installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/whoisyurii/christ-cli/main/install.sh | sh
+# stoic-cli installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/whoisyurii/stoic-cli/main/install.sh | sh
 
 set -e
 
-REPO="whoisyurii/christ-cli"
-BINARY="christ"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+REPO="whoisyurii/stoic-cli"
+BINARY="stoic"
 
-# Detect OS and architecture
-detect_platform() {
-    OS="$(uname -s)"
-    ARCH="$(uname -m)"
+detect_target() {
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    ARCH=$(uname -m)
 
     case "$OS" in
-        Linux)  OS="unknown-linux-gnu" ;;
-        Darwin) OS="apple-darwin" ;;
-        *)      echo "Error: Unsupported OS: $OS"; exit 1 ;;
+        linux)
+            case "$ARCH" in
+                x86_64) echo "x86_64-unknown-linux-gnu" ;;
+                aarch64|arm64) echo "aarch64-unknown-linux-gnu" ;;
+                *) echo "unsupported" ;;
+            esac
+            ;;
+        darwin)
+            case "$ARCH" in
+                x86_64) echo "x86_64-apple-darwin" ;;
+                arm64|aarch64) echo "aarch64-apple-darwin" ;;
+                *) echo "unsupported" ;;
+            esac
+            ;;
+        *) echo "unsupported" ;;
     esac
-
-    case "$ARCH" in
-        x86_64|amd64)  ARCH="x86_64" ;;
-        arm64|aarch64) ARCH="aarch64" ;;
-        *)             echo "Error: Unsupported architecture: $ARCH"; exit 1 ;;
-    esac
-
-    TARGET="${ARCH}-${OS}"
 }
 
-# Get latest release tag from GitHub
-get_latest_version() {
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-    if [ -z "$VERSION" ]; then
-        echo "Error: Could not determine latest version"
+install() {
+    TARGET=$(detect_target)
+    if [ "$TARGET" = "unsupported" ]; then
+        echo "  Unsupported platform: $(uname -s) $(uname -m)"
         exit 1
     fi
-}
 
-main() {
-    echo ""
-    echo "  Installing christ-cli..."
-    echo ""
+    echo "  Installing stoic-cli..."
 
-    detect_platform
-    get_latest_version
+    # Get latest version
+    VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
 
-    URL="https://github.com/${REPO}/releases/download/v${VERSION}/${BINARY}-${TARGET}.tar.gz"
+    if [ -z "$VERSION" ]; then
+        echo "  Failed to get latest version"
+        exit 1
+    fi
 
-    echo "  Platform:  ${TARGET}"
-    echo "  Version:   v${VERSION}"
-    echo "  URL:       ${URL}"
-    echo ""
+    echo "  Version: v$VERSION"
+    echo "  Target: $TARGET"
 
-    # Download and extract
+    URL="https://github.com/$REPO/releases/download/v${VERSION}/${BINARY}-${TARGET}.tar.gz"
+
     TMPDIR=$(mktemp -d)
     trap 'rm -rf "$TMPDIR"' EXIT
 
-    echo "  Downloading..."
-    curl -fsSL "$URL" -o "${TMPDIR}/christ.tar.gz"
+    curl -fsSL "$URL" -o "${TMPDIR}/stoic.tar.gz"
 
-    echo "  Extracting..."
-    tar xzf "${TMPDIR}/christ.tar.gz" -C "$TMPDIR"
+    # Extract
+    tar xzf "${TMPDIR}/stoic.tar.gz" -C "$TMPDIR"
 
-    echo "  Installing to ${INSTALL_DIR}..."
-    if [ -w "$INSTALL_DIR" ]; then
-        mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-    else
-        sudo mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-    fi
-    chmod +x "${INSTALL_DIR}/${BINARY}"
+    # Install
+    INSTALL_DIR="$HOME/.cargo/bin"
+    mkdir -p "$INSTALL_DIR"
+    mv "${TMPDIR}/${BINARY}" "$INSTALL_DIR/${BINARY}"
+    chmod +x "$INSTALL_DIR/${BINARY}"
 
     echo ""
-    echo "  christ-cli v${VERSION} installed successfully!"
+    echo "  stoic-cli v${VERSION} installed successfully!"
     echo ""
-    echo "  Run 'christ' to start reading the Bible."
+    echo "  Run 'stoic' to start reading Stoic philosophy."
     echo ""
 }
 
-main
+install

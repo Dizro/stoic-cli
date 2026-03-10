@@ -1,0 +1,24 @@
+{
+    "metadata": {
+        "work": "Unterredungen",
+        "author": "Epiktet",
+        "translator": "",
+        "language": "de",
+        "source": "",
+        "parsed_date": ""
+    },
+    "sections": [
+        {
+            "id": "discourses_b1_c1",
+            "book": 1,
+            "book_title": "Buch I",
+            "chapter": 1,
+            "chapter_title": "ÜBER DAS, WAS IN UNSERER MACHT STEHT, UND WAS NICHT",
+            "section": null,
+            "letter_number": null,
+            "text": "Von allen unseren Fähigkeiten werden Sie keine finden, die sich selbst erkennen kann...",
+            "word_count": 14,
+            "source_reference": "Buch I, Kapitel I"
+        }
+    ]
+}

@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::fs;
 use std::process::Command;
 
-const REPO: &str = "whoisyurii/christ-cli";
+const REPO: &str = "whoisyurii/stoic-cli";
 
 #[derive(Deserialize)]
 struct GithubRelease {
@@ -29,7 +29,7 @@ fn target_triple() -> &'static str {
 pub async fn check_latest_version() -> Result<String, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
-        .user_agent("christ-cli")
+        .user_agent("stoic-cli")
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -47,7 +47,6 @@ pub async fn check_latest_version() -> Result<String, String> {
         .await
         .map_err(|e| format!("Failed to parse release info: {}", e))?;
 
-    // Strip the "v" prefix
     let version = release.tag_name.trim_start_matches('v').to_string();
     Ok(version)
 }
@@ -66,22 +65,22 @@ pub async fn run_update(check_only: bool) -> Result<(), String> {
     println!("Current: v{}  Latest: v{}", current, latest);
 
     if check_only {
-        println!("Run `christ update` to install v{}.", latest);
+        println!("Run `stoic update` to install v{}.", latest);
         return Ok(());
     }
 
     let target = target_triple();
     let ext = if cfg!(windows) { "zip" } else { "tar.gz" };
     let url = format!(
-        "https://github.com/{}/releases/download/v{}/christ-{}.{}",
+        "https://github.com/{}/releases/download/v{}/stoic-{}.{}",
         REPO, latest, target, ext
     );
 
-    println!("Downloading christ v{} for {}...", latest, target);
+    println!("Downloading stoic v{} for {}...", latest, target);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
-        .user_agent("christ-cli")
+        .user_agent("stoic-cli")
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -112,12 +111,12 @@ pub async fn run_update(check_only: bool) -> Result<(), String> {
 
     // Write to temp file
     let temp_dir = std::env::temp_dir();
-    let archive_path = temp_dir.join(format!("christ-update.{}", ext));
+    let archive_path = temp_dir.join(format!("stoic-update.{}", ext));
     fs::write(&archive_path, &bytes)
         .map_err(|e| format!("Failed to write temp file: {}", e))?;
 
     // Extract
-    let extract_dir = temp_dir.join("christ-update-extract");
+    let extract_dir = temp_dir.join("stoic-update-extract");
     let _ = fs::remove_dir_all(&extract_dir);
     fs::create_dir_all(&extract_dir)
         .map_err(|e| format!("Failed to create temp dir: {}", e))?;
@@ -134,7 +133,7 @@ pub async fn run_update(check_only: bool) -> Result<(), String> {
             .map_err(|e| format!("Extract failed: {}", e))?;
     }
 
-    let binary_name = if cfg!(windows) { "christ.exe" } else { "christ" };
+    let binary_name = if cfg!(windows) { "stoic.exe" } else { "stoic" };
     let new_binary = extract_dir.join(binary_name);
 
     if !new_binary.exists() {
@@ -145,16 +144,14 @@ pub async fn run_update(check_only: bool) -> Result<(), String> {
     let current_exe = std::env::current_exe()
         .map_err(|e| format!("Cannot determine current binary path: {}", e))?;
 
-    // On Unix, we can replace the running binary by renaming
     let backup_path = current_exe.with_extension("old");
-    let _ = fs::remove_file(&backup_path); // Clean any previous backup
+    let _ = fs::remove_file(&backup_path);
 
     fs::rename(&current_exe, &backup_path)
         .map_err(|e| format!("Failed to backup current binary: {}", e))?;
 
     match fs::copy(&new_binary, &current_exe) {
         Ok(_) => {
-            // Set executable permissions on Unix
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -167,7 +164,6 @@ pub async fn run_update(check_only: bool) -> Result<(), String> {
             Ok(())
         }
         Err(e) => {
-            // Restore backup
             let _ = fs::rename(&backup_path, &current_exe);
             Err(format!("Failed to install new binary: {}", e))
         }

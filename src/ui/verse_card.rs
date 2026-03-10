@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-/// Render a single verse or range of verses in a beautiful framed card.
+/// Render a single passage or range of passages in a beautiful framed card.
 pub fn render_verse_card(frame: &mut Frame, area: Rect, verses: &[Verse], theme: &Theme) {
     if verses.is_empty() {
         return;
@@ -37,8 +37,8 @@ pub fn render_verse_card(frame: &mut Frame, area: Rect, verses: &[Verse], theme:
 
     let chunks = Layout::vertical([
         Constraint::Length(2), // Reference header
-        Constraint::Min(1),   // Verse text
-        Constraint::Length(1), // Translation badge
+        Constraint::Min(1),   // Text
+        Constraint::Length(1), // Author badge
     ])
     .split(inner);
 
@@ -49,26 +49,22 @@ pub fn render_verse_card(frame: &mut Frame, area: Rect, verses: &[Verse], theme:
     .alignment(Alignment::Center);
     frame.render_widget(header, chunks[0]);
 
-    // Verse text
+    // Passage text
     let text_lines: Vec<Line> = verses
         .iter()
-        .map(|v| {
-            Line::from(vec![
-                Span::styled(
-                    format!("{} ", v.verse),
-                    Style::default().fg(theme.text_dim),
-                ),
-                Span::styled(&v.text, Style::default().fg(theme.text)),
-            ])
+        .flat_map(|v| {
+            v.text.split('\n').map(|line| {
+                Line::from(Span::styled(line, Style::default().fg(theme.text)))
+            }).collect::<Vec<_>>()
         })
         .collect();
 
     let text = Paragraph::new(text_lines).wrap(Wrap { trim: true });
     frame.render_widget(text, chunks[1]);
 
-    // Translation badge
+    // Author badge
     let badge = Paragraph::new(Line::from(vec![Span::styled(
-        format!(" {} ", first.translation),
+        format!(" — {} ", first.translation),
         Style::default().fg(theme.text_muted),
     )]))
     .alignment(Alignment::Right);

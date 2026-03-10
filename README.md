@@ -1,96 +1,91 @@
-# christ-cli
+# stoic-cli
 
-A beautiful Bible TUI for Christian developers. Read Scripture in your terminal.
+A beautiful Stoic philosophy TUI — read Marcus Aurelius, Seneca & Epictetus in your terminal.
 
-Built with Rust. Single binary. Works offline with bundled KJV.
+## Demo
 
-![christ-cli demo](assets/demo.gif)
+![stoic-cli demo](assets/demo.gif)
 
 ## Install
 
-```sh
-npm install -g christ-cli
+```bash
+npm install -g stoic-cli
 ```
 
-Or with curl:
-```sh
-curl -fsSL https://raw.githubusercontent.com/whoisyurii/christ-cli/main/install.sh | sh
+Or via shell script:
+```bash
+curl -fsSL https://raw.githubusercontent.com/whoisyurii/stoic-cli/main/install.sh | sh
 ```
 
 ## Usage
 
-Launch the interactive TUI browser:
-```sh
-christ
+### Interactive TUI
+```bash
+stoic
 ```
 
-Read a specific verse:
-```sh
-christ read John 3:16
+### Read a specific passage
+```bash
+stoic read meditations 4:3
 ```
 
-Read a chapter:
-```sh
-christ read Genesis 1
+### Read a full book/letter
+```bash
+stoic read seneca 13
 ```
 
-Read a verse range:
-```sh
-christ read Psalm 23:1-6
+### Read a range of sections
+```bash
+stoic read discourses 1:2-5
 ```
 
-Search the Bible:
-```sh
-christ search "love one another"
+### Search all stoic texts
+```bash
+stoic search "virtue"
 ```
 
-Random verse:
-```sh
-christ random
+### Random stoic passage
+```bash
+stoic random
 ```
 
-Verse of the day:
-```sh
-christ today
+### Daily stoic passage
+```bash
+stoic daily
 ```
 
-Replay the startup animation:
-```sh
-christ intro
+### Replay intro animation
+```bash
+stoic intro
 ```
 
-## Interactive TUI
+When you run `stoic` with no arguments, it launches a full-screen terminal browser:
 
-When you run `christ` with no arguments, it launches a full-screen terminal browser:
+- **Three-panel layout:** Works → Books/Letters → Text
+- **Six languages:** English, Русский, Français, Deutsch, Latina, Ἑλληνικά
+- **Five themes:** Obsidian, Marble, Parchment, Bronze, Terminal
+- **Keyboard-driven:** Navigate with arrows/hjkl, search with `/`
+- **Fully offline:** All texts bundled in the binary
 
-- **Left/Right arrows** - switch between panels (Books, Chapters, Scripture)
-- **Up/Down arrows** - navigate within a panel
-- **Enter** - select a book or chapter
-- **/** - live search the Bible
-- **t** - cycle themes (Slate, Midnight, Parchment, Gospel)
-- **qq** - quit (press q twice)
+## Keybindings
 
-Your reading position and theme are saved automatically.
+| Key | Action |
+|-----|--------|
+| `←→` / `hl` | Switch panels |
+| `↑↓` / `jk` | Navigate items |
+| `Enter` | Select / Open |
+| `/` | Search |
+| `t` | Cycle theme |
+| `v` | Cycle language |
+| `qq` | Quit |
 
-## Features
+## Supported Texts
 
-- Full-screen TUI with 3-panel browser (Books | Chapters | Scripture)
-- Animated startup banner
-- Live search with instant results as you type
-- 4 themes: Slate (dark), Midnight (shadcn/Vercel dark), Parchment (warm light), Gospel (bright white)
-- Bundled KJV Bible (works 100% offline, no internet required)
-- Online API fallback for 50+ other translations via Bolls.life
-- Forgiving reference parser (jn 3:16, 1cor 13, Ps 23:1-6 all work)
-- Pipe-friendly (plain text when piped, rich TUI when interactive)
-- Session persistence (remembers where you left off)
-
-## Tech
-
-- Rust single binary (~5MB)
-- ratatui + crossterm for the TUI
-- Bundled KJV (4.7MB embedded, public domain)
-- Bolls.life API for other translations (no auth key needed)
-- Cross-platform: macOS, Linux, Windows
+| Work | Author | Original |
+|------|--------|----------|
+| Meditations | Marcus Aurelius | Greek |
+| Discourses | Epictetus | Greek |
+| Moral Letters | Seneca | Latin |
 
 ## License
 

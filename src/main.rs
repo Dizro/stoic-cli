@@ -10,6 +10,7 @@ mod update;
 
 use crate::api::Resolver;
 use crate::data::reference;
+
 use crate::ui::theme;
 use crate::ui::verse_card;
 use clap::Parser;
@@ -26,21 +27,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Some(Commands::Read {
             reference: ref_parts,
-            translation,
+            lang,
         }) => {
-            cmd_read(&ref_parts.join(" "), &translation).await?;
+            cmd_read(&ref_parts.join(" "), &lang)?;
         }
-        Some(Commands::Search {
-            query,
-            translation,
-        }) => {
-            cmd_search(&query.join(" "), &translation).await?;
+        Some(Commands::Search { query, lang }) => {
+            cmd_search(&query.join(" "), &lang)?;
         }
-        Some(Commands::Random { translation }) => {
-            cmd_random(&translation).await?;
+        Some(Commands::Random { lang }) => {
+            cmd_random(&lang)?;
         }
-        Some(Commands::Today { translation }) => {
-            cmd_today(&translation).await?;
+        Some(Commands::Daily { lang }) => {
+            cmd_daily(&lang)?;
         }
         Some(Commands::Intro) => {
             run_intro().await?;
@@ -77,35 +75,33 @@ fn load_theme() -> theme::Theme {
     theme::get_theme(saved.theme)
 }
 
-async fn cmd_read(ref_str: &str, translation: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_read(ref_str: &str, lang: &str) -> Result<(), Box<dyn std::error::Error>> {
     let parsed = reference::parse(ref_str).map_err(|e| format!("Parse error: {}", e))?;
     let resolver = Resolver::new();
 
     let is_tty = std::io::IsTerminal::is_terminal(&std::io::stdout());
 
-    match (parsed.verse_start, parsed.verse_end) {
+    match (parsed.section_start, parsed.section_end) {
         (Some(start), Some(end)) if start == end => {
-            // Single verse
+            // Single section
             let verse = resolver
-                .get_verse(parsed.book.name, parsed.chapter, start, translation)
-                .await
-                .map_err(|e| format!("Fetch error: {}", e))?;
+                .get_verse_lang(parsed.work.id, parsed.division, start, lang)
+                .map_err(|e| format!("Error: {}", e))?;
 
             if is_tty {
-                render_verse_tui(&[verse]).await?;
+                render_verse_tui(&[verse])?;
             } else {
                 println!("{}", format_verse_plain(&verse));
             }
         }
         (Some(start), Some(end)) => {
-            // Verse range
+            // Section range
             let verses = resolver
-                .get_verse_range(parsed.book.name, parsed.chapter, start, end, translation)
-                .await
-                .map_err(|e| format!("Fetch error: {}", e))?;
+                .get_verse_range_lang(parsed.work.id, parsed.division, start, end, lang)
+                .map_err(|e| format!("Error: {}", e))?;
 
             if is_tty {
-                render_verse_tui(&verses).await?;
+                render_verse_tui(&verses)?;
             } else {
                 for v in &verses {
                     println!("{}", format_verse_plain(v));
@@ -113,14 +109,13 @@ async fn cmd_read(ref_str: &str, translation: &str) -> Result<(), Box<dyn std::e
             }
         }
         _ => {
-            // Whole chapter
+            // Whole division (book/letter)
             let chapter = resolver
-                .get_chapter(parsed.book.name, parsed.chapter, translation)
-                .await
-                .map_err(|e| format!("Fetch error: {}", e))?;
+                .get_chapter_lang(parsed.work.id, parsed.division, lang)
+                .map_err(|e| format!("Error: {}", e))?;
 
             if is_tty {
-                render_verse_tui(&chapter.verses).await?;
+                render_verse_tui(&chapter.verses)?;
             } else {
                 for v in &chapter.verses {
                     println!("{}", format_verse_plain(v));
@@ -132,11 +127,10 @@ async fn cmd_read(ref_str: &str, translation: &str) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-async fn cmd_search(query: &str, translation: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_search(query: &str, lang: &str) -> Result<(), Box<dyn std::error::Error>> {
     let resolver = Resolver::new();
     let results = resolver
-        .search(query, translation)
-        .await
+        .search_lang(query, lang)
         .map_err(|e| format!("Search error: {}", e))?;
 
     if results.is_empty() {
@@ -151,7 +145,8 @@ async fn cmd_search(query: &str, translation: &str) -> Result<(), Box<dyn std::e
     );
     for r in &results {
         println!(
-            "  {} {}:{} - {}",
+            "  {} — {} {}:{} — {}",
+            r.translation, // author
             r.book,
             r.chapter,
             r.verse,
@@ -162,16 +157,13 @@ async fn cmd_search(query: &str, translation: &str) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-async fn cmd_random(translation: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_random(lang: &str) -> Result<(), Box<dyn std::error::Error>> {
     let resolver = Resolver::new();
-    let verse = resolver
-        .get_random_verse(translation)
-        .await
-        .map_err(|e| format!("Error: {}", e))?;
+    let verse = resolver.get_random_verse_lang(lang);
 
     let is_tty = std::io::IsTerminal::is_terminal(&std::io::stdout());
     if is_tty {
-        render_verse_tui(&[verse]).await?;
+        render_verse_tui(&[verse])?;
     } else {
         println!("{}", format_verse_plain(&verse));
     }
@@ -179,17 +171,13 @@ async fn cmd_random(translation: &str) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-async fn cmd_today(translation: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // Simple VOTD: use a deterministic verse based on the day
+fn cmd_daily(lang: &str) -> Result<(), Box<dyn std::error::Error>> {
     let resolver = Resolver::new();
-    let verse = resolver
-        .get_random_verse(translation)
-        .await
-        .map_err(|e| format!("Error: {}", e))?;
+    let verse = resolver.get_daily_verse_lang(lang);
 
     let is_tty = std::io::IsTerminal::is_terminal(&std::io::stdout());
     if is_tty {
-        render_verse_tui(&[verse]).await?;
+        render_verse_tui(&[verse])?;
     } else {
         println!("{}", format_verse_plain(&verse));
     }
@@ -197,7 +185,7 @@ async fn cmd_today(translation: &str) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-async fn render_verse_tui(
+fn render_verse_tui(
     verses: &[api::types::Verse],
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -213,7 +201,7 @@ async fn render_verse_tui(
             frame.render_widget(block, area);
 
             // Center the verse card
-            let card_height = (verses.len() as u16 * 2 + 6).min(area.height - 4);
+            let card_height = (verses.len() as u16 * 3 + 6).min(area.height - 4);
             let card_width = (area.width - 8).min(80);
             let card_area = ratatui::layout::Rect {
                 x: (area.width - card_width) / 2,
@@ -256,15 +244,20 @@ async fn render_verse_tui(
 
 fn format_verse_plain(verse: &api::types::Verse) -> String {
     format!(
-        "{} {}:{} - {} ({})",
-        verse.book, verse.chapter, verse.verse, verse.text, verse.translation
+        "{} — {} {}:{}\n{}",
+        verse.translation, // author
+        verse.book,
+        verse.chapter,
+        verse.verse,
+        verse.text
     )
 }
 
 fn truncate_text(text: &str, max_chars: usize) -> String {
+    let text = text.replace('\n', " ");
     let char_count = text.chars().count();
     if char_count <= max_chars {
-        text.to_string()
+        text
     } else {
         let truncated: String = text.chars().take(max_chars - 3).collect();
         format!("{}...", truncated)

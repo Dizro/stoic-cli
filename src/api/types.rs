@@ -6,7 +6,7 @@ pub struct Verse {
     pub chapter: u32,
     pub verse: u32,
     pub text: String,
-    pub translation: String,
+    pub translation: String, // Used for author name in stoic context
 }
 
 impl Verse {
@@ -42,28 +42,4 @@ impl SearchResult {
     pub fn reference(&self) -> String {
         format!("{} {}:{}", self.book, self.chapter, self.verse)
     }
-}
-
-#[allow(dead_code)]
-pub trait BibleProvider {
-    fn get_verse(
-        &self,
-        book: &str,
-        chapter: u32,
-        verse: u32,
-        translation: &str,
-    ) -> impl std::future::Future<Output = Result<Verse, String>> + Send;
-
-    fn get_chapter(
-        &self,
-        book: &str,
-        chapter: u32,
-        translation: &str,
-    ) -> impl std::future::Future<Output = Result<Chapter, String>> + Send;
-
-    fn search(
-        &self,
-        query: &str,
-        translation: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<SearchResult>, String>> + Send;
 }

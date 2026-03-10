@@ -4,8 +4,8 @@ const path = require("path");
 const https = require("https");
 const os = require("os");
 
-const REPO = "whoisyurii/christ-cli";
-const BINARY = "christ";
+const REPO = "whoisyurii/stoic-cli";
+const BINARY = "stoic";
 
 function getPlatform() {
   const platform = os.platform();
@@ -38,7 +38,7 @@ function getVersion() {
 function download(url, dest) {
   return new Promise((resolve, reject) => {
     const follow = (url) => {
-      https.get(url, { headers: { "User-Agent": "christ-cli-npm" } }, (res) => {
+      https.get(url, { headers: { "User-Agent": "stoic-cli-npm" } }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           follow(res.headers.location);
           return;
@@ -83,12 +83,12 @@ async function main() {
   const ext = isWindows ? "zip" : "tar.gz";
   const url = `https://github.com/${REPO}/releases/download/v${version}/${BINARY}-${target}.${ext}`;
 
-  console.log(`\n  Installing christ-cli v${version} for ${target}...\n`);
+  console.log(`\n  Installing stoic-cli v${version} for ${target}...\n`);
 
   const binDir = path.join(__dirname, "bin");
   fs.mkdirSync(binDir, { recursive: true });
 
-  const archivePath = path.join(binDir, `christ.${ext}`);
+  const archivePath = path.join(binDir, `stoic.${ext}`);
   await download(url, archivePath);
 
   console.log("  Extracting...");
@@ -101,7 +101,7 @@ async function main() {
   }
 
   fs.unlinkSync(archivePath);
-  console.log("  christ-cli installed successfully! Run: christ\n");
+  console.log("  stoic-cli installed successfully! Run: stoic\n");
 }
 
 main().catch((err) => {

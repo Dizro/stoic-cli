@@ -1,8 +1,7 @@
 use crate::api::types::{Chapter, SearchResult};
-use crate::data::books::BOOKS;
-use crate::store::cache;
+use crate::data::books::WORKS;
+use crate::data::stoics;
 use crate::ui::theme::{Theme, ThemeName};
-use std::sync::atomic::Ordering;
 use ratatui::{
     layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Modifier, Style, Stylize},
@@ -16,9 +15,9 @@ use ratatui::{
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Panel {
-    Books,
-    Chapters,
-    Scripture,
+    Works,
+    Sections,
+    Text,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,252 +30,165 @@ pub enum SearchMode {
     },
 }
 
-pub struct TranslationInfo {
-    pub code: &'static str,
-    pub name: &'static str,
-    pub lang: &'static str,
-    pub offline: bool,
-}
-
-pub const TRANSLATIONS: &[TranslationInfo] = &[
-    // English
-    TranslationInfo { code: "KJV", name: "King James Version", lang: "English", offline: true },
-    TranslationInfo { code: "WEB", name: "World English Bible", lang: "English", offline: false },
-    TranslationInfo { code: "NKJV", name: "New King James Version", lang: "English", offline: false },
-    TranslationInfo { code: "ESV", name: "English Standard Version", lang: "English", offline: false },
-    TranslationInfo { code: "NIV", name: "New International Version", lang: "English", offline: false },
-    TranslationInfo { code: "NLT", name: "New Living Translation", lang: "English", offline: false },
-    TranslationInfo { code: "NASB", name: "New American Standard Bible", lang: "English", offline: false },
-    TranslationInfo { code: "BSB", name: "Berean Standard Bible", lang: "English", offline: false },
-    TranslationInfo { code: "NET", name: "New English Translation", lang: "English", offline: false },
-    TranslationInfo { code: "MSG", name: "The Message", lang: "English", offline: false },
-    TranslationInfo { code: "YLT", name: "Young's Literal Translation", lang: "English", offline: false },
-    // Українська
-    TranslationInfo { code: "UBIO", name: "Переклад Огієнка", lang: "Українська", offline: false },
-    TranslationInfo { code: "UKRK", name: "Переклад Куліша", lang: "Українська", offline: false },
-    // Español
-    TranslationInfo { code: "RV1960", name: "Reina-Valera 1960", lang: "Español", offline: false },
-    TranslationInfo { code: "NVI", name: "Nueva Versión Internacional", lang: "Español", offline: false },
-    // Português
-    TranslationInfo { code: "ARA", name: "Almeida Revista e Atualizada", lang: "Português", offline: false },
-    TranslationInfo { code: "NVIPT", name: "NVI Português", lang: "Português", offline: false },
-    // Français
-    TranslationInfo { code: "FRLSG", name: "Louis Segond 1910", lang: "Français", offline: false },
-    TranslationInfo { code: "NBS", name: "Nouvelle Bible Segond", lang: "Français", offline: false },
-    // Deutsch
-    TranslationInfo { code: "LUT", name: "Luther Bibel", lang: "Deutsch", offline: false },
-    TranslationInfo { code: "ELB", name: "Elberfelder Bibel", lang: "Deutsch", offline: false },
-    // Русский
-    TranslationInfo { code: "SYNOD", name: "Синодальный перевод", lang: "Русский", offline: false },
-    TranslationInfo { code: "NRT", name: "Новый Русский Перевод", lang: "Русский", offline: false },
-    // 中文
-    TranslationInfo { code: "CUV", name: "和合本 (Traditional)", lang: "中文", offline: false },
-    TranslationInfo { code: "CUNPS", name: "和合本 (Simplified)", lang: "中文", offline: false },
-    // 한국어
-    TranslationInfo { code: "KRV", name: "개역한글판", lang: "한국어", offline: false },
-    // 日本語
-    TranslationInfo { code: "JPKJV", name: "口語訳聖書", lang: "日本語", offline: false },
-    // Italiano
-    TranslationInfo { code: "NR06", name: "Nuova Riveduta 2006", lang: "Italiano", offline: false },
-    // Nederlands
-    TranslationInfo { code: "HSV17", name: "Herziene Statenvertaling", lang: "Nederlands", offline: false },
-];
-
 pub struct BrowserState {
     pub active_panel: Panel,
-    pub book_list: ListState,
-    pub chapter_list: ListState,
-    pub scripture_scroll: u16,
-    pub selected_book_idx: usize,
-    pub selected_chapter: u32,
+    pub work_list: ListState,
+    pub section_list: ListState,
+    pub text_scroll: u16,
+    pub selected_work_idx: usize,
+    pub selected_division: u32,
     pub current_chapter: Option<Chapter>,
     pub loading: bool,
     pub search: SearchMode,
-    pub translation: String,
-    pub translation_picker: bool,
-    pub translation_list: ListState,
-    /// Localized book names for the current translation (indexed by BOOKS order).
-    /// Empty vec means use English names (KJV / fallback).
-    pub localized_books: Vec<String>,
-    /// Background download handle for caching a translation.
-    pub download: Option<cache::DownloadHandle>,
+    /// Current divisions list for the selected work
+    pub divisions: Vec<(u32, String)>,
     /// Verse to highlight after jumping from search results.
     pub highlight_verse: Option<u32>,
-    /// Error message to display in the scripture panel.
+    /// Error message to display in the text panel.
     pub error: Option<String>,
+    /// Current language code ("en", "ru", "fr", "de", "la", "el")
+    pub lang: String,
+    /// Index in LANGUAGES array
+    pub lang_idx: usize,
 }
 
 impl BrowserState {
     pub fn new() -> Self {
-        let mut book_list = ListState::default();
-        book_list.select(Some(0));
-        let mut chapter_list = ListState::default();
-        chapter_list.select(Some(0));
+        let mut work_list = ListState::default();
+        work_list.select(Some(0));
+        let mut section_list = ListState::default();
+        section_list.select(Some(0));
+
+        let divisions = stoics::get_divisions(WORKS[0].id);
 
         Self {
-            active_panel: Panel::Books,
-            book_list,
-            chapter_list,
-            scripture_scroll: 0,
-            selected_book_idx: 0,
-            selected_chapter: 1,
+            active_panel: Panel::Works,
+            work_list,
+            section_list,
+            text_scroll: 0,
+            selected_work_idx: 0,
+            selected_division: if divisions.is_empty() { 1 } else { divisions[0].0 },
             current_chapter: None,
             loading: false,
             search: SearchMode::Off,
-            translation: "KJV".to_string(),
-            translation_picker: false,
-            translation_list: ListState::default(),
-            localized_books: Vec::new(),
-            download: None,
+            divisions,
             highlight_verse: None,
             error: None,
+            lang: "en".to_string(),
+            lang_idx: 0,
         }
     }
 
     /// Restore from a saved session state.
     pub fn restore(&mut self, saved: &crate::store::state::SessionState) {
-        let book_idx = saved.book_index.min(BOOKS.len() - 1);
-        self.selected_book_idx = book_idx;
-        self.book_list.select(Some(book_idx));
+        let work_idx = saved.book_index.min(WORKS.len() - 1);
+        self.selected_work_idx = work_idx;
+        self.work_list.select(Some(work_idx));
 
-        let max_ch = BOOKS[book_idx].chapters;
-        self.selected_chapter = saved.chapter.clamp(1, max_ch);
-        self.chapter_list.select(Some((self.selected_chapter - 1) as usize));
+        self.divisions = stoics::get_divisions_lang(WORKS[work_idx].id, &self.lang);
 
-        self.scripture_scroll = saved.scroll_position;
-        self.active_panel = match saved.active_panel {
-            0 => Panel::Books,
-            1 => Panel::Chapters,
-            _ => Panel::Scripture,
-        };
-        if !saved.translation.is_empty() {
-            self.translation = saved.translation.clone();
+        if !self.divisions.is_empty() {
+            let div_idx = self.divisions.iter()
+                .position(|(d, _)| *d == saved.chapter)
+                .unwrap_or(0);
+            self.selected_division = self.divisions[div_idx].0;
+            self.section_list.select(Some(div_idx));
         }
+
+        self.text_scroll = saved.scroll_position;
+        self.active_panel = match saved.active_panel {
+            0 => Panel::Works,
+            1 => Panel::Sections,
+            _ => Panel::Text,
+        };
     }
 
     /// Snapshot current state for persistence.
     pub fn snapshot(&self) -> crate::store::state::SessionState {
         crate::store::state::SessionState {
-            book_index: self.selected_book_idx,
-            chapter: self.selected_chapter,
-            scroll_position: self.scripture_scroll,
+            book_index: self.selected_work_idx,
+            chapter: self.selected_division,
+            scroll_position: self.text_scroll,
             active_panel: match self.active_panel {
-                Panel::Books => 0,
-                Panel::Chapters => 1,
-                Panel::Scripture => 2,
+                Panel::Works => 0,
+                Panel::Sections => 1,
+                Panel::Text => 2,
             },
-            translation: self.translation.clone(),
             ..Default::default()
         }
     }
 
-    /// Returns true if the current translation is available offline (KJV or fully cached).
-    /// Returns true if the translation has local data (bundled KJV or any cached chapters).
-    /// Used to decide whether search can run locally (instant) vs needing API.
-    pub fn is_offline(&self) -> bool {
-        cache::has_cached_data(&self.translation)
+    pub fn selected_work(&self) -> &'static crate::data::books::WorkInfo {
+        &WORKS[self.selected_work_idx]
     }
 
-    /// Check if download is done and clean up the handle.
-    pub fn check_download(&mut self) {
-        if let Some(ref dl) = self.download {
-            if dl.done.load(Ordering::Relaxed) {
-                self.download = None;
-            }
+    pub fn update_divisions(&mut self) {
+        self.divisions = stoics::get_divisions_lang(WORKS[self.selected_work_idx].id, &self.lang);
+        self.section_list.select(Some(0));
+        if !self.divisions.is_empty() {
+            self.selected_division = self.divisions[0].0;
         }
     }
 
-    /// Get download progress as (completed, total) or None.
-    pub fn download_progress(&self) -> Option<(usize, usize)> {
-        self.download.as_ref().map(|dl| {
-            (dl.completed.load(Ordering::Relaxed), dl.total)
-        })
+    /// Cycle to the next language.
+    pub fn cycle_language(&mut self) {
+        self.lang_idx = (self.lang_idx + 1) % stoics::LANGUAGES.len();
+        self.lang = stoics::LANGUAGES[self.lang_idx].code.to_string();
+        self.update_divisions();
     }
 
-    /// Open translation picker, selecting the current translation.
-    pub fn open_translation_picker(&mut self) {
-        let current_idx = TRANSLATIONS
-            .iter()
-            .position(|t| t.code.eq_ignore_ascii_case(&self.translation))
-            .unwrap_or(0);
-        self.translation_list.select(Some(current_idx));
-        self.translation_picker = true;
+    pub fn lang_label(&self) -> &'static str {
+        stoics::LANGUAGES[self.lang_idx].native
     }
 
-    /// Select the translation from the picker. Returns true if translation changed.
-    pub fn pick_translation(&mut self) -> bool {
-        let idx = self.translation_list.selected().unwrap_or(0);
-        let new_trans = TRANSLATIONS[idx].code.to_string();
-        let changed = !new_trans.eq_ignore_ascii_case(&self.translation);
-        self.translation = new_trans;
-        self.translation_picker = false;
-        changed
-    }
-
-    pub fn selected_book_name(&self) -> &'static str {
-        BOOKS[self.selected_book_idx].name
-    }
-
-    /// Get the display name for a book (localized if available).
-    pub fn book_display_name(&self, idx: usize) -> &str {
-        if let Some(name) = self.localized_books.get(idx) {
-            if !name.is_empty() {
-                return name.as_str();
-            }
-        }
-        BOOKS[idx].name
-    }
-
-    pub fn selected_book_chapters(&self) -> u32 {
-        BOOKS[self.selected_book_idx].chapters
-    }
-
-    /// Move to the next panel (right arrow). If on Chapters, also selects and loads.
+    /// Move to the next panel (right arrow).
     pub fn next_panel_or_select(&mut self) -> bool {
         match self.active_panel {
-            Panel::Books => {
-                self.chapter_list.select(Some(0));
-                self.active_panel = Panel::Chapters;
+            Panel::Works => {
+                self.update_divisions();
+                self.active_panel = Panel::Sections;
                 false
             }
-            Panel::Chapters => {
-                let ch = self.chapter_list.selected().unwrap_or(0) as u32 + 1;
-                self.selected_chapter = ch;
-                self.scripture_scroll = 0;
-                self.active_panel = Panel::Scripture;
+            Panel::Sections => {
+                let idx = self.section_list.selected().unwrap_or(0);
+                if idx < self.divisions.len() {
+                    self.selected_division = self.divisions[idx].0;
+                }
+                self.text_scroll = 0;
+                self.active_panel = Panel::Text;
                 true // Signal to load chapter
             }
-            Panel::Scripture => false, // Already rightmost
+            Panel::Text => false,
         }
     }
 
     pub fn prev_panel(&mut self) {
         self.active_panel = match self.active_panel {
-            Panel::Books => Panel::Books, // Already leftmost
-            Panel::Chapters => Panel::Books,
-            Panel::Scripture => Panel::Chapters,
+            Panel::Works => Panel::Works,
+            Panel::Sections => Panel::Works,
+            Panel::Text => Panel::Sections,
         };
     }
 
     pub fn move_up(&mut self) {
         match self.active_panel {
-            Panel::Books => {
-                let i = self.book_list.selected().unwrap_or(0);
+            Panel::Works => {
+                let i = self.work_list.selected().unwrap_or(0);
                 if i > 0 {
-                    self.book_list.select(Some(i - 1));
-                    self.selected_book_idx = i - 1;
+                    self.work_list.select(Some(i - 1));
+                    self.selected_work_idx = i - 1;
                 }
             }
-            Panel::Chapters => {
-                let i = self.chapter_list.selected().unwrap_or(0);
+            Panel::Sections => {
+                let i = self.section_list.selected().unwrap_or(0);
                 if i > 0 {
-                    self.chapter_list.select(Some(i - 1));
+                    self.section_list.select(Some(i - 1));
                 }
             }
-            Panel::Scripture => {
+            Panel::Text => {
                 self.highlight_verse = None;
-                if self.scripture_scroll > 0 {
-                    self.scripture_scroll -= 1;
+                if self.text_scroll > 0 {
+                    self.text_scroll -= 1;
                 }
             }
         }
@@ -284,42 +196,43 @@ impl BrowserState {
 
     pub fn move_down(&mut self) {
         match self.active_panel {
-            Panel::Books => {
-                let i = self.book_list.selected().unwrap_or(0);
-                if i < BOOKS.len() - 1 {
-                    self.book_list.select(Some(i + 1));
-                    self.selected_book_idx = i + 1;
+            Panel::Works => {
+                let i = self.work_list.selected().unwrap_or(0);
+                if i < WORKS.len() - 1 {
+                    self.work_list.select(Some(i + 1));
+                    self.selected_work_idx = i + 1;
                 }
             }
-            Panel::Chapters => {
-                let i = self.chapter_list.selected().unwrap_or(0);
-                let max = self.selected_book_chapters() as usize;
-                if i < max - 1 {
-                    self.chapter_list.select(Some(i + 1));
+            Panel::Sections => {
+                let i = self.section_list.selected().unwrap_or(0);
+                if i < self.divisions.len().saturating_sub(1) {
+                    self.section_list.select(Some(i + 1));
                 }
             }
-            Panel::Scripture => {
+            Panel::Text => {
                 self.highlight_verse = None;
-                self.scripture_scroll += 1;
+                self.text_scroll += 1;
             }
         }
     }
 
     pub fn select_current(&mut self) -> bool {
         match self.active_panel {
-            Panel::Books => {
-                self.chapter_list.select(Some(0));
-                self.active_panel = Panel::Chapters;
+            Panel::Works => {
+                self.update_divisions();
+                self.active_panel = Panel::Sections;
                 false
             }
-            Panel::Chapters => {
-                let ch = self.chapter_list.selected().unwrap_or(0) as u32 + 1;
-                self.selected_chapter = ch;
-                self.scripture_scroll = 0;
-                self.active_panel = Panel::Scripture;
+            Panel::Sections => {
+                let idx = self.section_list.selected().unwrap_or(0);
+                if idx < self.divisions.len() {
+                    self.selected_division = self.divisions[idx].0;
+                }
+                self.text_scroll = 0;
+                self.active_panel = Panel::Text;
                 true
             }
-            Panel::Scripture => false,
+            Panel::Text => false,
         }
     }
 
@@ -333,18 +246,26 @@ impl BrowserState {
         }
     }
 
-    /// Navigate to a book and chapter from a search result.
-    pub fn jump_to_result(&mut self, book: &str, chapter: u32, verse: u32) {
-        // Find the book index
-        if let Some(idx) = BOOKS.iter().position(|b| b.name.eq_ignore_ascii_case(book)) {
-            self.selected_book_idx = idx;
-            self.book_list.select(Some(idx));
-            self.selected_chapter = chapter;
-            self.chapter_list.select(Some((chapter - 1) as usize));
-            self.scripture_scroll = 0;
-            self.active_panel = Panel::Scripture;
+    /// Navigate to a work and section from a search result.
+    pub fn jump_to_result(&mut self, work_name: &str, division: u32, section: u32) {
+        // Find the work index by matching the work name
+        if let Some(idx) = WORKS.iter().position(|w| {
+            work_name.contains(w.name) || work_name.to_lowercase().contains(&w.name.to_lowercase())
+        }) {
+            self.selected_work_idx = idx;
+            self.work_list.select(Some(idx));
+            self.update_divisions();
+
+            // Find the division in the divisions list
+            if let Some(div_idx) = self.divisions.iter().position(|(d, _)| *d == division) {
+                self.section_list.select(Some(div_idx));
+            }
+
+            self.selected_division = division;
+            self.text_scroll = 0;
+            self.active_panel = Panel::Text;
             self.search = SearchMode::Off;
-            self.highlight_verse = Some(verse);
+            self.highlight_verse = Some(section);
         }
     }
 }
@@ -360,7 +281,7 @@ pub fn render_browser(
     // Outer border
     let outer_block = Block::default()
         .title(Line::from(vec![
-            Span::styled(" christ", Style::default().fg(theme.accent).bold()),
+            Span::styled(" stoic", Style::default().fg(theme.accent).bold()),
             Span::styled("-cli ", Style::default().fg(theme.text_dim)),
         ]))
         .borders(Borders::ALL)
@@ -390,30 +311,22 @@ pub fn render_browser(
 
     // Three panels
     let panels = Layout::horizontal([
-        Constraint::Percentage(22), // Books
-        Constraint::Percentage(13), // Chapters
-        Constraint::Percentage(65), // Scripture
+        Constraint::Percentage(20), // Works
+        Constraint::Percentage(20), // Sections/Books/Letters
+        Constraint::Percentage(60), // Text
     ])
     .split(main_and_status[0]);
 
-    render_books_panel(frame, panels[0], state, theme);
-    render_chapters_panel(frame, panels[1], state, theme);
-
-    let translation = state.translation.clone();
-    let dl = state.download_progress();
+    render_works_panel(frame, panels[0], state, theme);
+    render_sections_panel(frame, panels[1], state, theme);
 
     if has_search_input {
         render_search_results_panel(frame, panels[2], state, theme);
         render_search_input(frame, main_and_status[1], state, theme);
-        render_status_bar(frame, main_and_status[2], theme, theme_name, &translation, dl);
+        render_status_bar(frame, main_and_status[2], theme, theme_name, state.lang_label());
     } else {
-        render_scripture_panel(frame, panels[2], state, theme);
-        render_status_bar(frame, main_and_status[1], theme, theme_name, &translation, dl);
-    }
-
-    // Translation picker popup
-    if state.translation_picker {
-        render_translation_picker(frame, area, state, theme);
+        render_text_panel(frame, panels[2], state, theme);
+        render_status_bar(frame, main_and_status[1], theme, theme_name, state.lang_label());
     }
 
     // Quit confirmation popup
@@ -430,11 +343,11 @@ fn panel_border_style(active: bool, theme: &Theme) -> Style {
     }
 }
 
-fn render_books_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
-    let is_active = state.active_panel == Panel::Books && matches!(state.search, SearchMode::Off);
+fn render_works_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
+    let is_active = state.active_panel == Panel::Works && matches!(state.search, SearchMode::Off);
     let block = Block::default()
         .title(Span::styled(
-            " Books ",
+            " Works ",
             Style::default()
                 .fg(if is_active { theme.accent } else { theme.text_dim })
                 .bold(),
@@ -445,14 +358,11 @@ fn render_books_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, t
         .padding(Padding::horizontal(1))
         .style(Style::default().bg(theme.surface));
 
-    // Available width for book names: area - borders(2) - padding(2) - highlight_symbol(3)
-    let max_name_width = (area.width as usize).saturating_sub(7);
-
-    let items: Vec<ListItem> = BOOKS
+    let items: Vec<ListItem> = WORKS
         .iter()
         .enumerate()
-        .map(|(i, _book)| {
-            let style = if Some(i) == state.book_list.selected() {
+        .flat_map(|(i, work)| {
+            let style = if Some(i) == state.work_list.selected() {
                 Style::default()
                     .fg(theme.accent)
                     .bg(theme.highlight_bg)
@@ -460,21 +370,39 @@ fn render_books_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, t
             } else {
                 Style::default().fg(theme.text)
             };
-            let name = truncate_display_name(&state.book_display_name(i), max_name_width);
-            ListItem::new(Span::styled(name, style))
+            let author_style = if Some(i) == state.work_list.selected() {
+                Style::default()
+                    .fg(theme.accent_soft)
+                    .bg(theme.highlight_bg)
+            } else {
+                Style::default().fg(theme.text_dim)
+            };
+
+            vec![
+                ListItem::new(Line::from(Span::styled(work.name, style))),
+                ListItem::new(Line::from(Span::styled(
+                    format!("  {}", work.author),
+                    author_style,
+                ))),
+                ListItem::new(Line::default()), // spacer
+            ]
         })
         .collect();
 
-    let list = List::new(items).block(block).highlight_symbol(" > ");
+    let list = List::new(items).block(block).highlight_symbol(" ▸ ");
 
-    frame.render_stateful_widget(list, area, &mut state.book_list);
+    // We need to map UI selection to our triple-line layout
+    frame.render_widget(list, area);
 }
 
-fn render_chapters_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
-    let is_active = state.active_panel == Panel::Chapters && matches!(state.search, SearchMode::Off);
+fn render_sections_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
+    let is_active = state.active_panel == Panel::Sections && matches!(state.search, SearchMode::Off);
+    let work = state.selected_work();
+    let section_label = work.section_label;
+
     let block = Block::default()
         .title(Span::styled(
-            " Ch ",
+            format!(" {} ", section_label),
             Style::default()
                 .fg(if is_active { theme.accent } else { theme.text_dim })
                 .bold(),
@@ -485,10 +413,13 @@ fn render_chapters_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState
         .padding(Padding::horizontal(1))
         .style(Style::default().bg(theme.surface));
 
-    let chapter_count = state.selected_book_chapters();
-    let items: Vec<ListItem> = (1..=chapter_count)
-        .map(|ch| {
-            let is_selected = Some(ch as usize - 1) == state.chapter_list.selected();
+    let max_name_width = (area.width as usize).saturating_sub(7);
+
+    let items: Vec<ListItem> = state.divisions
+        .iter()
+        .enumerate()
+        .map(|(i, (_num, label))| {
+            let is_selected = Some(i) == state.section_list.selected();
             let style = if is_selected {
                 Style::default()
                     .fg(theme.accent)
@@ -497,23 +428,28 @@ fn render_chapters_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState
             } else {
                 Style::default().fg(theme.text)
             };
-            ListItem::new(Span::styled(format!("{}", ch), style))
+            let name = truncate_display_name(label, max_name_width);
+            ListItem::new(Span::styled(name, style))
         })
         .collect();
 
-    let list = List::new(items).block(block).highlight_symbol(" > ");
+    let list = List::new(items).block(block).highlight_symbol(" ▸ ");
 
-    frame.render_stateful_widget(list, area, &mut state.chapter_list);
+    frame.render_stateful_widget(list, area, &mut state.section_list);
 }
 
-fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
-    let is_active = state.active_panel == Panel::Scripture && matches!(state.search, SearchMode::Off);
+fn render_text_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, theme: &Theme) {
+    let is_active = state.active_panel == Panel::Text && matches!(state.search, SearchMode::Off);
 
+    let work = state.selected_work();
     let title = if state.current_chapter.is_some() {
-        let book_name = state.book_display_name(state.selected_book_idx);
-        format!(" {} {} ", book_name, state.selected_chapter)
+        let label = match work.id {
+            "letters" => stoics::localized_letter_label(&state.lang),
+            _ => stoics::localized_book_label(&state.lang),
+        };
+        format!(" {} — {} {} ", work.author, label, state.selected_division)
     } else {
-        " Scripture ".to_string()
+        " Text ".to_string()
     };
 
     let block = Block::default()
@@ -567,25 +503,46 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
             .iter()
             .flat_map(|v| {
                 let is_highlighted = highlight == Some(v.verse);
-                let verse_line = Line::from(vec![
-                    Span::styled(
-                        format!(" {} ", v.verse),
-                        if is_highlighted {
-                            Style::default().fg(theme.search_match)
-                        } else {
-                            Style::default().fg(theme.text_muted)
-                        },
-                    ),
-                    Span::styled(
-                        &v.text,
-                        if is_highlighted {
-                            Style::default().fg(theme.search_match)
-                        } else {
-                            Style::default().fg(theme.text)
-                        },
-                    ),
-                ]);
-                vec![verse_line, Line::default()]
+
+                // Build text lines — split by newlines to properly render multi-paragraph passages
+                let mut verse_lines = Vec::new();
+
+                // Section number header
+                verse_lines.push(Line::from(Span::styled(
+                    format!("§{}", v.verse),
+                    if is_highlighted {
+                        Style::default().fg(theme.search_match).bold()
+                    } else {
+                        Style::default().fg(theme.accent_soft).bold()
+                    },
+                )));
+                verse_lines.push(Line::default());
+
+                // Text content
+                for text_line in v.text.split('\n') {
+                    if text_line.is_empty() {
+                        verse_lines.push(Line::default());
+                    } else {
+                        verse_lines.push(Line::from(Span::styled(
+                            text_line,
+                            if is_highlighted {
+                                Style::default().fg(theme.search_match)
+                            } else {
+                                Style::default().fg(theme.text)
+                            },
+                        )));
+                    }
+                }
+
+                // Separator between sections
+                verse_lines.push(Line::default());
+                verse_lines.push(Line::from(Span::styled(
+                    "─".repeat(40),
+                    Style::default().fg(theme.border),
+                )));
+                verse_lines.push(Line::default());
+
+                verse_lines
             })
             .collect();
 
@@ -593,7 +550,6 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
         let visible_height = inner.height;
         let wrap_width = inner.width as usize;
 
-        // Calculate wrapped height per line (for scroll targeting)
         let line_heights: Vec<u16> = lines
             .iter()
             .map(|line| {
@@ -612,29 +568,41 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
         let content_height: u16 = line_heights.iter().sum();
 
         // Auto-scroll to highlighted verse
-        if let Some(target_verse) = highlight {
-            // Each verse produces 2 lines (verse + blank), target is at index (verse-1)*2
-            let target_line_idx = (target_verse.saturating_sub(1) as usize) * 2;
-            let scroll_to: u16 = line_heights.iter().take(target_line_idx).sum();
-            // Center the verse on screen
-            let center_offset = visible_height / 3;
-            state.scripture_scroll = scroll_to.saturating_sub(center_offset);
+        if let Some(_target_verse) = highlight {
+            // Find the line index for the target verse header
+            let mut current_line = 0u16;
+            for (i, line) in lines.iter().enumerate() {
+                if let Some(span) = line.spans.first() {
+                    if span.content.starts_with('§') {
+                        if let Some(num_str) = span.content.strip_prefix('§') {
+                            if let Ok(num) = num_str.parse::<u32>() {
+                                if Some(num) == highlight {
+                                    let center_offset = visible_height / 3;
+                                    state.text_scroll = current_line.saturating_sub(center_offset);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                current_line += line_heights.get(i).copied().unwrap_or(1);
+            }
         }
 
         // Clamp scroll
         if content_height > visible_height {
             let max_scroll = content_height - visible_height;
-            if state.scripture_scroll > max_scroll {
-                state.scripture_scroll = max_scroll;
+            if state.text_scroll > max_scroll {
+                state.text_scroll = max_scroll;
             }
         } else {
-            state.scripture_scroll = 0;
+            state.text_scroll = 0;
         }
 
         let paragraph = Paragraph::new(lines)
             .block(block)
             .wrap(Wrap { trim: false })
-            .scroll((state.scripture_scroll, 0));
+            .scroll((state.text_scroll, 0));
 
         frame.render_widget(paragraph, area);
 
@@ -642,7 +610,7 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
         if content_height > visible_height {
             let max_scroll = (content_height - visible_height) as usize;
             let mut scrollbar_state = ScrollbarState::new(max_scroll)
-                .position(state.scripture_scroll as usize);
+                .position(state.text_scroll as usize);
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .style(Style::default().fg(theme.border));
             frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
@@ -652,13 +620,26 @@ fn render_scripture_panel(frame: &mut Frame, area: Rect, state: &mut BrowserStat
             Line::default(),
             Line::default(),
             Line::from(Span::styled(
-                "Select a book and chapter to begin reading",
+                "Select a work and section to begin reading",
                 Style::default().fg(theme.text_dim),
             )),
             Line::default(),
             Line::from(Span::styled(
                 "Use arrow keys to navigate, Enter to select",
                 Style::default().fg(theme.text_muted),
+            )),
+            Line::default(),
+            Line::from(Span::styled(
+                "\"The happiness of your life depends upon",
+                Style::default().fg(theme.text_muted).italic(),
+            )),
+            Line::from(Span::styled(
+                "  the quality of your thoughts.\"",
+                Style::default().fg(theme.text_muted).italic(),
+            )),
+            Line::from(Span::styled(
+                "                  — Marcus Aurelius",
+                Style::default().fg(theme.accent_soft),
             )),
         ])
         .block(block)
@@ -736,8 +717,7 @@ fn render_search_results_panel(
                 Style::default().fg(theme.text_dim)
             };
 
-            // Highlight matching text
-            let ref_str = format!("{} {}:{}", r.book, r.chapter, r.verse);
+            let ref_str = format!("{} — {}", r.translation, r.reference());
             let text = truncate_result_text(&r.text, 60);
 
             let mut spans = vec![
@@ -745,7 +725,7 @@ fn render_search_results_panel(
                 Span::styled("  ", text_style),
             ];
 
-            // Simple highlight: find match by char index for UTF-8 safety
+            // Simple highlight
             let text_chars: Vec<char> = text.chars().collect();
             let query_chars: Vec<char> = query_lower.chars().collect();
             let text_lower_chars: Vec<char> = text.to_lowercase().chars().collect();
@@ -791,18 +771,10 @@ fn render_search_input(frame: &mut Frame, area: Rect, state: &BrowserState, them
         .style(Style::default().bg(theme.surface));
 
     let cursor = "\u{2588}";
-    let mut spans = vec![
+    let spans = vec![
         Span::styled(query, Style::default().fg(theme.text)),
         Span::styled(cursor, Style::default().fg(theme.accent_soft)),
     ];
-
-    // Show hint for online translations
-    if !state.is_offline() && query.is_empty() {
-        spans.push(Span::styled(
-            " Enter to search",
-            Style::default().fg(theme.text_dim),
-        ));
-    }
 
     let input = Paragraph::new(Line::from(spans)).block(block);
     frame.render_widget(input, area);
@@ -813,20 +785,17 @@ fn render_status_bar(
     area: Rect,
     theme: &Theme,
     theme_name: ThemeName,
-    translation: &str,
-    download_progress: Option<(usize, usize)>,
+    lang_label: &str,
 ) {
-    let keybinds = vec![
-        ("\u{2190}\u{2192}/hl", "panels"),
+    let keybinds = [("\u{2190}\u{2192}/hl", "panels"),
         ("\u{2191}\u{2193}/jk", "navigate"),
         ("Enter", "select"),
         ("/", "search"),
         ("t", theme_name.label()),
-        ("v", translation),
-        ("qq", "quit"),
-    ];
+        ("v", lang_label),
+        ("qq", "quit")];
 
-    let mut spans: Vec<Span> = keybinds
+    let spans: Vec<Span> = keybinds
         .iter()
         .flat_map(|(key, desc)| {
             vec![
@@ -843,18 +812,6 @@ fn render_status_bar(
         })
         .collect();
 
-    if let Some((completed, total)) = download_progress {
-        let pct = if total > 0 {
-            (completed * 100) / total
-        } else {
-            0
-        };
-        spans.push(Span::styled(
-            format!(" Caching {}%", pct),
-            Style::default().fg(theme.accent).bold(),
-        ));
-    }
-
     let bar = Paragraph::new(Line::from(spans)).style(Style::default().bg(theme.bg));
     frame.render_widget(bar, area);
 }
@@ -865,8 +822,7 @@ fn truncate_display_name(name: &str, max_width: usize) -> String {
     if w <= max_width {
         return name.to_string();
     }
-    // Truncate to fit within max_width, leaving room for ellipsis
-    let target = max_width.saturating_sub(1); // 1 for ellipsis character
+    let target = max_width.saturating_sub(1);
     let mut truncated = String::new();
     let mut current_w = 0;
     for ch in name.chars() {
@@ -879,102 +835,6 @@ fn truncate_display_name(name: &str, max_width: usize) -> String {
     }
     truncated.push('\u{2026}');
     truncated
-}
-
-fn render_translation_picker(
-    frame: &mut Frame,
-    area: Rect,
-    state: &mut BrowserState,
-    theme: &Theme,
-) {
-    // Build display lines with language headers
-    let mut lines: Vec<Line> = Vec::new();
-    let mut last_lang = "";
-    let mut selected_display_row: u16 = 0;
-
-    for (i, t) in TRANSLATIONS.iter().enumerate() {
-        if t.lang != last_lang {
-            if !last_lang.is_empty() {
-                lines.push(Line::default()); // blank separator between groups
-            }
-            lines.push(Line::from(Span::styled(
-                format!("  {}", t.lang),
-                Style::default().fg(theme.text_muted).add_modifier(Modifier::BOLD),
-            )));
-            last_lang = t.lang;
-        }
-
-        if Some(i) == state.translation_list.selected() {
-            selected_display_row = lines.len() as u16;
-        }
-
-        let is_selected = Some(i) == state.translation_list.selected();
-        let is_current = t.code.eq_ignore_ascii_case(&state.translation);
-        let style = if is_selected {
-            Style::default()
-                .fg(theme.accent)
-                .bg(theme.highlight_bg)
-                .add_modifier(Modifier::BOLD)
-        } else if is_current {
-            Style::default().fg(theme.accent_soft).bold()
-        } else {
-            Style::default().fg(theme.text)
-        };
-
-        let prefix = if is_selected { " \u{25b8} " } else { "   " };
-        let suffix = if t.offline || cache::is_fully_cached(t.code) {
-            " (offline)"
-        } else if cache::has_cached_data(t.code) {
-            " (cached)"
-        } else {
-            ""
-        };
-        let marker = if is_current { " \u{2713}" } else { "" };
-        lines.push(Line::from(vec![
-            Span::styled(prefix.to_string(), style),
-            Span::styled(format!("{:<8}", t.code), style),
-            Span::styled(t.name.to_string(), style),
-            Span::styled(suffix.to_string(), Style::default().fg(theme.text_muted)),
-            Span::styled(marker.to_string(), Style::default().fg(theme.search_match).bold()),
-        ]));
-    }
-
-    let popup_width = 54u16;
-    let popup_height = (lines.len() as u16 + 4).min(area.height.saturating_sub(4));
-
-    let horizontal = Layout::horizontal([Constraint::Length(popup_width)])
-        .flex(Flex::Center)
-        .split(area);
-    let vertical = Layout::vertical([Constraint::Length(popup_height)])
-        .flex(Flex::Center)
-        .split(horizontal[0]);
-    let popup_area = vertical[0];
-
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title(Span::styled(
-            " Select Translation ",
-            Style::default().fg(theme.accent).bold(),
-        ))
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(theme.border_active))
-        .padding(Padding::horizontal(1))
-        .style(Style::default().bg(theme.surface));
-
-    let inner_height = block.inner(popup_area).height;
-    let scroll = if selected_display_row >= inner_height {
-        selected_display_row.saturating_sub(inner_height / 2)
-    } else {
-        0
-    };
-
-    let paragraph = Paragraph::new(lines)
-        .block(block)
-        .scroll((scroll, 0));
-
-    frame.render_widget(paragraph, popup_area);
 }
 
 fn render_quit_popup(frame: &mut Frame, area: Rect, theme: &Theme) {
@@ -1009,9 +869,11 @@ fn render_quit_popup(frame: &mut Frame, area: Rect, theme: &Theme) {
 }
 
 fn truncate_result_text(text: &str, max_chars: usize) -> String {
+    // Remove newlines for display in search results
+    let text = text.replace('\n', " ");
     let char_count = text.chars().count();
     if char_count <= max_chars {
-        text.to_string()
+        text
     } else {
         let truncated: String = text.chars().take(max_chars - 3).collect();
         format!("{}...", truncated)

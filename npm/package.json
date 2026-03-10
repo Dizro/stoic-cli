@@ -1,18 +1,26 @@
 {
-  "name": "christ-cli",
-  "version": "0.5.4",
-  "description": "A beautiful Bible TUI for Christian developers",
-  "license": "MIT",
+  "name": "stoic-cli",
+  "version": "0.1.0",
+  "description": "A beautiful Stoic philosophy TUI — read Aurelius, Seneca & Epictetus in your terminal",
   "repository": {
     "type": "git",
-    "url": "https://github.com/whoisyurii/christ-cli"
+    "url": "https://github.com/whoisyurii/stoic-cli"
   },
   "bin": {
-    "christ": "bin/run.js"
+    "stoic": "bin/run.js"
   },
   "scripts": {
     "postinstall": "node install.js"
   },
-  "keywords": ["bible", "cli", "tui", "christian", "scripture", "kjv"],
-  "author": "whoisyurii"
+  "keywords": [
+    "stoic",
+    "stoicism",
+    "philosophy",
+    "cli",
+    "tui",
+    "aurelius",
+    "seneca",
+    "epictetus"
+  ],
+  "license": "MIT"
 }
