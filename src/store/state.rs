@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+fn default_lang() -> String {
+    "en".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SessionState {
     pub book_index: usize,
@@ -12,6 +16,8 @@ pub struct SessionState {
     pub active_panel: u8, // 0=Works, 1=Sections, 2=Text
     #[serde(default)]
     pub theme: ThemeName,
+    #[serde(default = "default_lang")]
+    pub lang: String,
 }
 
 fn state_path() -> Option<PathBuf> {

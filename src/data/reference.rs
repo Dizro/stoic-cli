@@ -10,6 +10,7 @@ pub struct StoicReference {
 }
 
 impl StoicReference {
+    #[allow(dead_code)]
     pub fn display(&self) -> String {
         match (self.section_start, self.section_end) {
             (Some(start), Some(end)) if start != end => {

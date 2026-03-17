@@ -12,15 +12,6 @@ impl Resolver {
         Self
     }
 
-    pub fn get_verse(
-        &self,
-        work_id: &str,
-        division: u32,
-        section: u32,
-    ) -> Result<Verse, String> {
-        self.get_verse_lang(work_id, division, section, "en")
-    }
-
     pub fn get_verse_lang(
         &self,
         work_id: &str,
@@ -32,13 +23,13 @@ impl Resolver {
             .ok_or_else(|| format!("Passage not found: {} {}:{}", work_id, division, section))
     }
 
+    #[allow(dead_code)]
     pub fn get_chapter(
         &self,
         work_id: &str,
         division: u32,
     ) -> Result<Chapter, String> {
-        stoics::get_chapter(work_id, division)
-            .ok_or_else(|| format!("Section not found: {} {}", work_id, division))
+        self.get_chapter_lang(work_id, division, "en")
     }
 
     pub fn get_chapter_lang(
@@ -49,16 +40,6 @@ impl Resolver {
     ) -> Result<Chapter, String> {
         stoics::get_chapter_lang(work_id, division, lang)
             .ok_or_else(|| format!("Section not found: {} {}", work_id, division))
-    }
-
-    pub fn get_verse_range(
-        &self,
-        work_id: &str,
-        division: u32,
-        section_start: u32,
-        section_end: u32,
-    ) -> Result<Vec<Verse>, String> {
-        self.get_verse_range_lang(work_id, division, section_start, section_end, "en")
     }
 
     pub fn get_verse_range_lang(
@@ -82,13 +63,6 @@ impl Resolver {
         }
     }
 
-    pub fn search(
-        &self,
-        query: &str,
-    ) -> Result<Vec<SearchResult>, String> {
-        Ok(stoics::search(query))
-    }
-
     pub fn search_lang(
         &self,
         query: &str,
@@ -97,16 +71,8 @@ impl Resolver {
         Ok(stoics::search_lang(query, lang))
     }
 
-    pub fn get_random_verse(&self) -> Verse {
-        stoics::random_verse()
-    }
-
     pub fn get_random_verse_lang(&self, lang: &str) -> Verse {
         stoics::random_verse_lang(lang)
-    }
-
-    pub fn get_daily_verse(&self) -> Verse {
-        stoics::daily_verse()
     }
 
     pub fn get_daily_verse_lang(&self, lang: &str) -> Verse {

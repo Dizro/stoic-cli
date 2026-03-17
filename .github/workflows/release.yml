@@ -52,21 +52,21 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../christ-${{ matrix.target }}.tar.gz christ
+          tar czf ../../../stoic-${{ matrix.target }}.tar.gz stoic
           cd ../../..
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../christ-${{ matrix.target }}.zip christ.exe
+          7z a ../../../stoic-${{ matrix.target }}.zip stoic.exe
           cd ../../..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: christ-${{ matrix.target }}
-          path: christ-${{ matrix.target }}.*
+          name: stoic-${{ matrix.target }}
+          path: stoic-${{ matrix.target }}.*
 
   release:
     name: Create Release
@@ -84,7 +84,7 @@ jobs:
       - name: Generate SHA256 checksums
         run: |
           cd artifacts
-          sha256sum christ-* > SHA256SUMS.txt
+          sha256sum stoic-* > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Create GitHub Release
@@ -92,8 +92,8 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            artifacts/christ-*.tar.gz
-            artifacts/christ-*.zip
+            artifacts/stoic-*.tar.gz
+            artifacts/stoic-*.zip
             artifacts/SHA256SUMS.txt
 
   publish-npm:

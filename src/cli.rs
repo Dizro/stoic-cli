@@ -14,36 +14,47 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Read a stoic passage (e.g. "meditations 4:3", "seneca 13", "discourses 1:2")
+    /// Read a specific stoic passage
+    ///
+    /// Formats:
+    ///   stoic read meditations 4:3       (Book 4, §3)
+    ///   stoic read aurelius 4            (Book 4, all)
+    ///   stoic read discourses 1:2-5      (Book 1, §2-5)
+    ///   stoic read seneca 13             (Letter 13)
+    ///   stoic read med 4:3               (abbreviation)
+    ///
+    /// Work aliases: meditations/med/aurelius/marcus/ma
+    ///               discourses/disc/epictetus/epic/ep
+    ///               seneca/letters/sen/ml/epistles
     Read {
-        /// Stoic reference (e.g. "aurelius 4:3", "seneca 13")
+        /// Stoic reference, e.g. "meditations 4:3" or "seneca 13" or "med 4:3-5"
         #[arg(required = true, num_args = 1..)]
         reference: Vec<String>,
-        /// Optional language code (en, ru, fr, de, la, el)
+        /// Language code: en (default), ru, fr, de, la, el
         #[arg(long, default_value = "en")]
         lang: String,
     },
 
-    /// Search all stoic texts for a phrase or keyword
+    /// Search across all stoic texts for a phrase or keyword
     Search {
-        /// Search query
+        /// Search query (case-insensitive)
         #[arg(required = true, num_args = 1..)]
         query: Vec<String>,
-        /// Optional language code (en, ru, fr, de, la, el)
+        /// Language to search in: en, ru, fr, de, la, el
         #[arg(long, default_value = "en")]
         lang: String,
     },
 
-    /// Display a random stoic passage
+    /// Display a random stoic passage (different each run)
     Random {
-        /// Optional language code (en, ru, fr, de, la, el)
+        /// Language code: en, ru, fr, de, la, el
         #[arg(long, default_value = "en")]
         lang: String,
     },
 
-    /// Show today's daily stoic passage
+    /// Show today's stoic passage (same passage all day, changes each day)
     Daily {
-        /// Optional language code (en, ru, fr, de, la, el)
+        /// Language code: en, ru, fr, de, la, el
         #[arg(long, default_value = "en")]
         lang: String,
     },

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 
 mod api;
 mod app;
@@ -41,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd_daily(&lang)?;
         }
         Some(Commands::Intro) => {
-            run_intro().await?;
+            run_tui(true).await?;
         }
         Some(Commands::Update { check }) => {
             if let Err(e) = update::run_update(check).await {
@@ -62,13 +61,6 @@ async fn run_tui(show_banner: bool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn run_intro() -> Result<(), Box<dyn std::error::Error>> {
-    let terminal = ratatui::init();
-    let result = app::App::new(true).run(terminal).await;
-    ratatui::restore();
-    result?;
-    Ok(())
-}
 
 fn load_theme() -> theme::Theme {
     let saved = store::state::load();
@@ -139,19 +131,24 @@ fn cmd_search(query: &str, lang: &str) -> Result<(), Box<dyn std::error::Error>>
     }
 
     println!(
-        "Found {} results for \"{}\":\n",
+        "Found {} results for \"{}\" [lang: {}]:\n",
         results.len(),
-        query
+        query,
+        lang
     );
     for r in &results {
         println!(
             "  {} — {} {}:{} — {}",
-            r.translation, // author
+            r.translation,
             r.book,
             r.chapter,
             r.verse,
             truncate_text(&r.text, 80)
         );
+    }
+
+    if lang == "en" {
+        println!("\n  Tip: Use --lang ru/fr/de/la/el to search in other languages.");
     }
 
     Ok(())

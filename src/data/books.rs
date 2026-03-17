@@ -7,6 +7,7 @@ pub struct WorkInfo {
     pub author: &'static str,
     pub abbrevs: &'static [&'static str],
     /// Number of top-level divisions (books for Meditations/Discourses, letters for Seneca)
+    #[allow(dead_code)]
     pub sections: u32,
     /// Label for top-level divisions
     pub section_label: &'static str,

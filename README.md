@@ -1,11 +1,16 @@
-# stoic-cli
+<p align="center">
+  <img src="assets/logo.png" alt="Stoic CLI Logo" width="300">
+</p>
 
-A beautiful Stoic philosophy TUI — read Marcus Aurelius, Seneca & Epictetus in your terminal.
+<p align="center">
+  A beautiful Stoic philosophy TUI — read Marcus Aurelius, Seneca & Epictetus in your terminal.
+</p>
 
-## Demo
+<p align="center">
+  <img src="assets/browser.png" alt="Stoic CLI Interface" width="800" style="border-radius: 8px;">
+</p>
 
-![stoic-cli demo](assets/demo.gif)
-
+---
 ## Install
 
 ```bash
@@ -14,7 +19,7 @@ npm install -g stoic-cli
 
 Or via shell script:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/whoisyurii/stoic-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Dizro/stoic-cli/main/install.sh | sh
 ```
 
 ## Usage

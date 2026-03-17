@@ -7,7 +7,7 @@ use crate::ui::theme::{self, ThemeName};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::widgets::ListState;
 use ratatui::{DefaultTerminal, Frame};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 enum AppMode {
     Banner(BannerState),
@@ -18,7 +18,7 @@ pub struct App {
     mode: AppMode,
     resolver: Resolver,
     should_quit: bool,
-    quit_pending: Option<Instant>,
+    quit_pending: bool,
     theme_name: ThemeName,
 }
 
@@ -34,7 +34,7 @@ impl App {
             mode,
             resolver: Resolver::new(),
             should_quit: false,
-            quit_pending: None,
+            quit_pending: false,
             theme_name: ThemeName::default(),
         }
     }
@@ -118,12 +118,6 @@ impl App {
         let area = frame.area();
         let theme = theme::get_theme(self.theme_name);
 
-        if let Some(t) = self.quit_pending {
-            if t.elapsed() > Duration::from_secs(2) {
-                self.quit_pending = None;
-            }
-        }
-
         match &mut self.mode {
             AppMode::Banner(state) => {
                 banner::render_banner(frame, area, state, &theme);
@@ -133,7 +127,7 @@ impl App {
                     frame,
                     area,
                     state,
-                    self.quit_pending.is_some(),
+                    self.quit_pending,
                     &theme,
                     self.theme_name,
                 );
@@ -202,14 +196,14 @@ impl App {
 
                 // Normal browser mode
                 if key == KeyCode::Char('q') {
-                    if self.quit_pending.is_some() {
+                    if self.quit_pending {
                         self.should_quit = true;
                     } else {
-                        self.quit_pending = Some(Instant::now());
+                        self.quit_pending = true;
                     }
                     return;
                 }
-                self.quit_pending = None;
+                self.quit_pending = false;
 
                 match key {
                     KeyCode::Char('/') => {

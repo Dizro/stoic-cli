@@ -50,6 +50,8 @@ pub struct BrowserState {
     pub lang: String,
     /// Index in LANGUAGES array
     pub lang_idx: usize,
+    /// True when selected work has no data in the current language
+    pub lang_not_available: bool,
 }
 
 impl BrowserState {
@@ -59,7 +61,7 @@ impl BrowserState {
         let mut section_list = ListState::default();
         section_list.select(Some(0));
 
-        let divisions = stoics::get_divisions(WORKS[0].id);
+        let divisions = stoics::get_divisions_lang(WORKS[0].id, "en");
 
         Self {
             active_panel: Panel::Works,
@@ -76,16 +78,24 @@ impl BrowserState {
             error: None,
             lang: "en".to_string(),
             lang_idx: 0,
+            lang_not_available: false,
         }
     }
 
     /// Restore from a saved session state.
     pub fn restore(&mut self, saved: &crate::store::state::SessionState) {
+        // Restore language first — needed for localised division names
+        if let Some(idx) = stoics::LANGUAGES.iter().position(|l| l.code == saved.lang.as_str()) {
+            self.lang_idx = idx;
+            self.lang = saved.lang.clone();
+        }
+
         let work_idx = saved.book_index.min(WORKS.len() - 1);
         self.selected_work_idx = work_idx;
         self.work_list.select(Some(work_idx));
 
         self.divisions = stoics::get_divisions_lang(WORKS[work_idx].id, &self.lang);
+        self.lang_not_available = self.divisions.is_empty();
 
         if !self.divisions.is_empty() {
             let div_idx = self.divisions.iter()
@@ -114,6 +124,7 @@ impl BrowserState {
                 Panel::Sections => 1,
                 Panel::Text => 2,
             },
+            lang: self.lang.clone(),
             ..Default::default()
         }
     }
@@ -124,6 +135,7 @@ impl BrowserState {
 
     pub fn update_divisions(&mut self) {
         self.divisions = stoics::get_divisions_lang(WORKS[self.selected_work_idx].id, &self.lang);
+        self.lang_not_available = self.divisions.is_empty();
         self.section_list.select(Some(0));
         if !self.divisions.is_empty() {
             self.selected_division = self.divisions[0].0;
@@ -413,6 +425,30 @@ fn render_sections_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState
         .padding(Padding::horizontal(1))
         .style(Style::default().bg(theme.surface));
 
+    // Show message if this work is not available in the selected language
+    if state.lang_not_available {
+        let msg = Paragraph::new(vec![
+            Line::default(),
+            Line::from(Span::styled(
+                "⚠  Not available",
+                Style::default().fg(theme.text_muted),
+            )),
+            Line::from(Span::styled(
+                "in this language",
+                Style::default().fg(theme.text_muted),
+            )),
+            Line::default(),
+            Line::from(Span::styled(
+                "Press v",
+                Style::default().fg(theme.accent_soft).bold(),
+            )),
+        ])
+        .block(block)
+        .alignment(Alignment::Center);
+        frame.render_widget(msg, area);
+        return;
+    }
+
     let max_name_width = (area.width as usize).saturating_sub(7);
 
     let items: Vec<ListItem> = state.divisions
@@ -442,12 +478,13 @@ fn render_text_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, th
     let is_active = state.active_panel == Panel::Text && matches!(state.search, SearchMode::Off);
 
     let work = state.selected_work();
-    let title = if state.current_chapter.is_some() {
+    let title = if let Some(ref ch) = state.current_chapter {
         let label = match work.id {
             "letters" => stoics::localized_letter_label(&state.lang),
             _ => stoics::localized_book_label(&state.lang),
         };
-        format!(" {} — {} {} ", work.author, label, state.selected_division)
+        let count = ch.verses.len();
+        format!(" {} — {} {}  ·  {} § ", work.author, label, state.selected_division, count)
     } else {
         " Text ".to_string()
     };
@@ -616,34 +653,51 @@ fn render_text_panel(frame: &mut Frame, area: Rect, state: &mut BrowserState, th
             frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
         }
     } else {
-        let hint = Paragraph::new(vec![
-            Line::default(),
-            Line::default(),
-            Line::from(Span::styled(
-                "Select a work and section to begin reading",
-                Style::default().fg(theme.text_dim),
-            )),
-            Line::default(),
-            Line::from(Span::styled(
-                "Use arrow keys to navigate, Enter to select",
-                Style::default().fg(theme.text_muted),
-            )),
-            Line::default(),
-            Line::from(Span::styled(
-                "\"The happiness of your life depends upon",
-                Style::default().fg(theme.text_muted).italic(),
-            )),
-            Line::from(Span::styled(
-                "  the quality of your thoughts.\"",
-                Style::default().fg(theme.text_muted).italic(),
-            )),
-            Line::from(Span::styled(
-                "                  — Marcus Aurelius",
-                Style::default().fg(theme.accent_soft),
-            )),
-        ])
-        .block(block)
-        .alignment(Alignment::Center);
+        let hint_lines = if state.lang_not_available {
+            vec![
+                Line::default(),
+                Line::default(),
+                Line::from(Span::styled(
+                    "⚠  Not available in this language",
+                    Style::default().fg(theme.text_dim),
+                )),
+                Line::default(),
+                Line::from(Span::styled(
+                    "Press v to switch language",
+                    Style::default().fg(theme.accent_soft),
+                )),
+            ]
+        } else {
+            vec![
+                Line::default(),
+                Line::default(),
+                Line::from(Span::styled(
+                    "Select a work and section to begin reading",
+                    Style::default().fg(theme.text_dim),
+                )),
+                Line::default(),
+                Line::from(Span::styled(
+                    "Use arrow keys to navigate, Enter to select",
+                    Style::default().fg(theme.text_muted),
+                )),
+                Line::default(),
+                Line::from(Span::styled(
+                    "\"The happiness of your life depends upon",
+                    Style::default().fg(theme.text_muted).italic(),
+                )),
+                Line::from(Span::styled(
+                    "  the quality of your thoughts.\"",
+                    Style::default().fg(theme.text_muted).italic(),
+                )),
+                Line::from(Span::styled(
+                    "                  — Marcus Aurelius",
+                    Style::default().fg(theme.accent_soft),
+                )),
+            ]
+        };
+        let hint = Paragraph::new(hint_lines)
+            .block(block)
+            .alignment(Alignment::Center);
         frame.render_widget(hint, area);
     }
 }

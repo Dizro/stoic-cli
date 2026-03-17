@@ -4,7 +4,7 @@
   "description": "A beautiful Stoic philosophy TUI — read Aurelius, Seneca & Epictetus in your terminal",
   "repository": {
     "type": "git",
-    "url": "https://github.com/whoisyurii/stoic-cli"
+    "url": "https://github.com/Dizro/stoic-cli"
   },
   "bin": {
     "stoic": "bin/run.js"

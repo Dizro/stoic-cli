@@ -1,10 +1,10 @@
 #!/bin/sh
 # stoic-cli installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/whoisyurii/stoic-cli/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/Dizro/stoic-cli/main/install.sh | sh
 
 set -e
 
-REPO="whoisyurii/stoic-cli"
+REPO="Dizro/stoic-cli"
 BINARY="stoic"
 
 detect_target() {
@@ -60,8 +60,8 @@ install() {
     # Extract
     tar xzf "${TMPDIR}/stoic.tar.gz" -C "$TMPDIR"
 
-    # Install
-    INSTALL_DIR="$HOME/.cargo/bin"
+    # Install to ~/.local/bin (XDG standard, no Rust required)
+    INSTALL_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
     mkdir -p "$INSTALL_DIR"
     mv "${TMPDIR}/${BINARY}" "$INSTALL_DIR/${BINARY}"
     chmod +x "$INSTALL_DIR/${BINARY}"
@@ -70,6 +70,12 @@ install() {
     echo "  stoic-cli v${VERSION} installed successfully!"
     echo ""
     echo "  Run 'stoic' to start reading Stoic philosophy."
+    echo ""
+    # Warn if not in PATH
+    case ":$PATH:" in
+        *":$INSTALL_DIR:"*) ;;
+        *) echo "  ⚠  Add '$INSTALL_DIR' to your PATH if 'stoic' is not found:" ;;
+    esac
     echo ""
 }
 

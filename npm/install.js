@@ -4,7 +4,7 @@ const path = require("path");
 const https = require("https");
 const os = require("os");
 
-const REPO = "whoisyurii/stoic-cli";
+const REPO = "Dizro/stoic-cli";
 const BINARY = "stoic";
 
 function getPlatform() {

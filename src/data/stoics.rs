@@ -69,6 +69,7 @@ const EL_DISCOURSES: &str = include_str!("../../data/el/discourses.json");
 
 pub struct LangInfo {
     pub code: &'static str,
+    #[allow(dead_code)]
     pub name: &'static str,
     pub native: &'static str,
 }
@@ -199,10 +200,6 @@ fn section_title(s: &StoicSection) -> Option<&str> {
     s.letter_title.as_deref().or(s.chapter_title.as_deref())
 }
 
-pub fn get_chapter(work_id: &str, division: u32) -> Option<Chapter> {
-    get_chapter_lang(work_id, division, "en")
-}
-
 pub fn get_chapter_lang(work_id: &str, division: u32, lang: &str) -> Option<Chapter> {
     let work = get_work(work_id, lang)?;
 
@@ -243,10 +240,12 @@ pub fn get_chapter_lang(work_id: &str, division: u32, lang: &str) -> Option<Chap
     })
 }
 
+#[allow(dead_code)]
 pub fn get_section_names(work_id: &str, division: u32) -> Vec<String> {
     get_section_names_lang(work_id, division, "en")
 }
 
+#[allow(dead_code)]
 pub fn get_section_names_lang(work_id: &str, division: u32, lang: &str) -> Vec<String> {
     let Some(work) = get_work(work_id, lang) else {
         return vec![];
@@ -266,6 +265,7 @@ pub fn get_section_names_lang(work_id: &str, division: u32, lang: &str) -> Vec<S
         .collect()
 }
 
+#[allow(dead_code)]
 pub fn get_divisions(work_id: &str) -> Vec<(u32, String)> {
     get_divisions_lang(work_id, "en")
 }
@@ -334,10 +334,6 @@ pub fn get_divisions_lang(work_id: &str, lang: &str) -> Vec<(u32, String)> {
     }
 }
 
-pub fn get_verse(work_id: &str, division: u32, section: u32) -> Option<Verse> {
-    get_verse_lang(work_id, division, section, "en")
-}
-
 pub fn get_verse_lang(work_id: &str, division: u32, section: u32, lang: &str) -> Option<Verse> {
     let work = get_work(work_id, lang)?;
 
@@ -356,10 +352,6 @@ pub fn get_verse_lang(work_id: &str, division: u32, section: u32, lang: &str) ->
         text: format!("{}{}", title_prefix, s.text),
         translation: work.metadata.author.clone(),
     })
-}
-
-pub fn search(query: &str) -> Vec<SearchResult> {
-    search_lang(query, "en")
 }
 
 pub fn search_lang(query: &str, lang: &str) -> Vec<SearchResult> {
@@ -391,17 +383,13 @@ pub fn search_lang(query: &str, lang: &str) -> Vec<SearchResult> {
     results
 }
 
-pub fn random_verse() -> Verse {
-    random_verse_lang("en")
-}
-
 pub fn random_verse_lang(lang: &str) -> Verse {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let seed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .subsec_nanos() as usize;
+        .unwrap_or_default()
+        .as_nanos() as usize;
 
     let lib = get_lang_library(lang);
     let all_works = [&lib.meditations, &lib.discourses, &lib.letters];
@@ -446,10 +434,6 @@ pub fn random_verse_lang(lang: &str) -> Verse {
         text: s.text.clone(),
         translation: work.metadata.author.clone(),
     }
-}
-
-pub fn daily_verse() -> Verse {
-    daily_verse_lang("en")
 }
 
 pub fn daily_verse_lang(lang: &str) -> Verse {

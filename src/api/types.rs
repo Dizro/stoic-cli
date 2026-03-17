@@ -24,6 +24,7 @@ pub struct Chapter {
 }
 
 impl Chapter {
+    #[allow(dead_code)]
     pub fn reference(&self) -> String {
         format!("{} {}", self.book, self.chapter)
     }

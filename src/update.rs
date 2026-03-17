@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::fs;
 use std::process::Command;
 
-const REPO: &str = "whoisyurii/stoic-cli";
+const REPO: &str = "Dizro/stoic-cli";
 
 #[derive(Deserialize)]
 struct GithubRelease {
