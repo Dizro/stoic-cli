@@ -86,11 +86,11 @@ When you run `stoic` with no arguments, it launches a full-screen terminal brows
 
 ## Supported Texts
 
-| Work | Author | Original |
-|------|--------|----------|
-| Meditations | Marcus Aurelius | Greek |
-| Discourses | Epictetus | Greek |
-| Moral Letters | Seneca | Latin |
+| Work | Author | Original | Available Translations |
+|------|--------|----------|------------------------|
+| Meditations | Marcus Aurelius | Greek | EN, RU, FR, DE, EL |
+| Discourses | Epictetus | Greek | EN, RU, FR, DE, EL |
+| Moral Letters | Seneca | Latin | EN, RU, FR, DE, LA |
 
 ## License
 
